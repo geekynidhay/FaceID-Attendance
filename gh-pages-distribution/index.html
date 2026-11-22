@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>DOT-CMC Attendance Portal & Kiosk</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#030712">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="DOT-CMC">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Face API JS -->
+  <script src="face-api.min.js"></script>
+  <!-- FontAwesome 6 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #030712;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .scan-reticle {
+      position: absolute;
+      inset: 20px;
+      border: 2px dashed rgba(16, 185, 129, 0.4);
+      border-radius: 24px;
+      pointer-events: none;
+    }
+    .corner-bracket {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border-color: #10b981;
+      border-style: solid;
+      pointer-events: none;
+    }
+    .corner-tl { top: 12px; left: 12px; border-width: 3.5px 0 0 3.5px; border-top-left-radius: 10px; }
+    .corner-tr { top: 12px; right: 12px; border-width: 3.5px 3.5px 0 0; border-top-right-radius: 10px; }
+    .corner-bl { bottom: 12px; left: 12px; border-width: 0 0 3.5px 3.5px; border-bottom-left-radius: 10px; }
+    .corner-br { bottom: 12px; right: 12px; border-width: 0 3.5px 3.5px 0; border-bottom-right-radius: 10px; }
+
+    .cyber-laser {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #10b981, #34d399, transparent);
+      box-shadow: 0 0 16px 2px #10b981;
+      animation: modernScan 2.4s ease-in-out infinite;
+      display: none;
+    }
+    @keyframes modernScan {
+      0% { top: 10%; opacity: 0.2; }
+      50% { top: 88%; opacity: 1; }
+      100% { top: 10%; opacity: 0.2; }
+    }
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+    .glass-card {
+      background: rgba(17, 24, 39, 0.7);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-header {
+      background: rgba(3, 7, 18, 0.85);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+  </style>
+</head>
+<body class="text-slate-100 min-h-screen flex flex-col justify-between antialiased">
+
+  <!-- ================= TOP HEADER (RESPONSIVE) ================= -->
+  <header class="glass-header sticky top-0 z-40 px-4 md:px-8 py-3.5">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      
+      <!-- Logo & Branding -->
+      <div class="flex items-center space-x-3.5">
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white shadow-lg shadow-emerald-500/25">
+          <i class="fa-solid fa-graduation-cap text-lg"></i>
+        </div>
+        <div>
+          <h1 class="text-base md:text-lg font-extrabold text-white tracking-tight leading-tight">DOT-CMC Computer Center</h1>
+          <div id="wa-pill" onclick="handleWhatsAppPillClick()" class="cursor-pointer inline-flex items-center space-x-1.5 mt-0.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span id="wa-status-text" class="text-xs font-semibold text-emerald-400">WhatsApp Active</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- DESKTOP TOP NAV TABS (HIDDEN ON PHONE) -->
+      <nav class="hidden md:flex items-center space-x-2 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800">
+        <button id="web-nav-scan-btn" onclick="switchTab('scan')" class="px-5 py-2 rounded-xl text-xs font-bold transition bg-emerald-600 text-white shadow-md shadow-emerald-600/30">
+          <i class="fa-solid fa-camera mr-2"></i> Entrance Scanner
+        </button>
+        <button id="web-nav-register-btn" onclick="switchTab('register')" class="px-5 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition">
+          <i class="fa-solid fa-user-plus mr-2"></i> Register Student
+        </button>
+        <button id="web-nav-logs-btn" onclick="switchTab('logs')" class="px-5 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition">
+          <i class="fa-solid fa-list-check mr-2"></i> Attendance Logs
+        </button>
+      </nav>
+
+      <!-- Action Icons (Camera Flip & Settings) -->
+      <div class="flex items-center space-x-2.5">
+        <button onclick="toggleCameraMirror()" title="Flip Camera" class="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/50 flex items-center justify-center text-slate-300 active:scale-95 transition">
+          <i class="fa-solid fa-camera-rotate text-xs"></i>
+        </button>
+        <button onclick="openServerConfigModal()" title="Server Config" class="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/50 flex items-center justify-center text-slate-300 active:scale-95 transition">
+          <i class="fa-solid fa-gear text-xs"></i>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ================= MAIN CONTAINER (RESPONSIVE: EXPANDS FULL WIDTH ON WEB) ================= -->
+  <main class="flex-1 w-full max-w-7xl mx-auto p-4 md:p-8">
+
+    <!-- 1. SCANNER VIEW -->
+    <section id="tab-scan" class="w-full">
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+        
+        <!-- Camera Column (Full 7 cols on Desktop, Full Width on Phone) -->
+        <div class="md:col-span-7 space-y-4">
+          <div class="relative w-full aspect-[4/3] rounded-3xl overflow-hidden glass-card border border-slate-800 shadow-2xl flex items-center justify-center">
+            <video id="video-stream" autoplay muted playsinline class="w-full h-full object-cover"></video>
+            <canvas id="overlay-canvas"></canvas>
+            
+            <div class="corner-bracket corner-tl"></div>
+            <div class="corner-bracket corner-tr"></div>
+            <div class="corner-bracket corner-bl"></div>
+            <div class="corner-bracket corner-br"></div>
+            <div class="scan-reticle"></div>
+            <div id="scanner-laser" class="cyber-laser"></div>
+
+            <!-- Initializing Loader -->
+            <div id="model-loader" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center z-30 p-6 text-center">
+              <div class="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-3">
+                <i class="fa-solid fa-circle-notch fa-spin text-2xl"></i>
+              </div>
+              <p id="loader-status" class="text-sm font-bold text-white">Loading Neural Vision Engine...</p>
+              <p class="text-xs text-slate-400 mt-1">Preparing high-precision face recognition</p>
+            </div>
+
+            <!-- Floating Status -->
+            <div class="absolute bottom-4 inset-x-4 z-20 flex justify-center">
+              <div class="px-4 py-2 rounded-full bg-slate-950/85 backdrop-blur-md border border-slate-700/60 shadow-lg flex items-center space-x-2.5">
+                <span id="detected-counter" class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                <span id="scanner-status-text" class="text-xs md:text-sm font-semibold text-slate-200">Face camera & press ENTER to scan</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Controls -->
+          <div class="flex items-center gap-3">
+            <button id="btn-manual-scan" onclick="triggerManualScan()" class="flex-1 py-3.5 px-6 bg-gradient-to-r from-emerald-500 to-teal-500 active:from-emerald-600 active:to-teal-600 rounded-2xl font-bold text-white shadow-lg shadow-emerald-500/25 flex items-center justify-center space-x-2 text-sm transition active:scale-[0.98]">
+              <i class="fa-solid fa-expand text-base"></i>
+              <span>SCAN FACE (PRESS ENTER)</span>
+            </button>
+
+            <button onclick="toggleContinuousScan()" id="btn-toggle-continuous" class="py-3 px-4 glass-card hover:bg-slate-800/80 rounded-2xl border border-slate-800 flex items-center space-x-2 active:scale-95 transition">
+              <i class="fa-solid fa-bolt text-xs text-slate-400"></i>
+              <span class="text-xs font-bold text-slate-400">AUTO:</span>
+              <span id="auto-scan-status" class="text-xs font-extrabold text-rose-400">OFF</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Verification & Status Column (5 cols on Desktop) -->
+        <div class="md:col-span-5 space-y-4">
+          
+          <!-- Live Result Card -->
+          <div class="glass-card rounded-3xl p-6 border border-slate-800 shadow-xl min-h-[160px] flex flex-col justify-center">
+            
+            <div id="checkin-blank" class="flex items-center space-x-4 py-3">
+              <div class="w-14 h-14 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex items-center justify-center text-slate-400 text-2xl">
+                <i class="fa-solid fa-fingerprint"></i>
+              </div>
+              <div>
+                <h4 class="text-sm font-bold text-white">Ready for Check-in</h4>
+                <p class="text-xs text-slate-400 mt-1">Stand in front of the camera and press Enter</p>
+                <div class="flex items-center space-x-2 mt-2 text-[11px] text-emerald-400">
+                  <i class="fa-brands fa-whatsapp"></i>
+                  <span>WhatsApp alerts: Entry + Exit</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Success Card -->
+            <div id="checkin-result" class="hidden space-y-3.5 animate-fade-in">
+              <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div class="flex items-center space-x-3.5">
+                  <div class="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-2xl">
+                    <i class="fa-solid fa-circle-check"></i>
+                  </div>
+                  <div>
+                    <h3 id="res-student-name" class="text-base font-extrabold text-white">Student Name</h3>
+                    <p id="res-roll-batch" class="text-xs font-semibold text-emerald-400">Class 12 • ENTERED</p>
+                  </div>
+                </div>
+                <span id="res-wa-badge" class="px-3 py-1 rounded-full text-xs font-extrabold tracking-wide uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  DISPATCHED
+                </span>
+              </div>
+
+              <div class="flex items-center justify-between text-xs text-slate-300 pt-1">
+                <span class="flex items-center">
+                  <i class="fa-brands fa-whatsapp text-emerald-400 text-sm mr-2"></i>
+                  Parent: <strong id="res-parent-phone" class="font-mono text-white ml-1">9893177887</strong>
+                </span>
+                <span id="res-checkin-time" class="font-mono text-slate-400 text-xs">10:45 AM</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Kiosk Info Box -->
+          <div class="glass-card rounded-3xl p-5 border border-slate-800/80 text-xs text-slate-400 space-y-2.5">
+            <div class="flex items-center justify-between text-slate-300 font-semibold">
+              <span class="flex items-center">
+                <i class="fa-solid fa-users text-emerald-400 mr-2"></i> Registered Students
+              </span>
+              <span id="faces-count" class="font-mono font-bold text-white px-2 py-0.5 rounded-lg bg-slate-800">0</span>
+            </div>
+            <div class="flex items-center justify-between text-slate-300 font-semibold pt-2 border-t border-slate-800/60">
+              <span class="flex items-center">
+                <i class="fa-solid fa-shield-halved text-emerald-400 mr-2"></i> Two-way Safe Audit
+              </span>
+              <span class="text-[11px] text-emerald-400">Active</span>
+            </div>
+            <p class="text-[11px] text-slate-500 pt-1">
+              Automatic Entry detection on first scan, and departure confirmation popup when leaving.
+            </p>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- 2. REGISTRATION VIEW (WIDE DESKTOP LAYOUT) -->
+    <section id="tab-register" class="hidden w-full max-w-4xl mx-auto">
+      <div class="glass-card rounded-3xl p-6 md:p-8 border border-slate-800 shadow-2xl">
+        <div class="mb-6">
+          <h2 class="text-xl font-extrabold text-white flex items-center">
+            <i class="fa-solid fa-user-plus text-emerald-400 mr-3 text-lg"></i> Student Registration
+          </h2>
+          <p class="text-xs md:text-sm text-slate-400 mt-1">Register face descriptors and link parent WhatsApp number</p>
+        </div>
+
+        <form id="register-form" onsubmit="handleRegistration(event)" class="space-y-6">
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <!-- Left: Form inputs -->
+            <div class="space-y-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Student Full Name *</label>
+                <input type="text" id="reg-name" required placeholder="e.g. Rahul Sharma" 
+                       class="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500">
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Roll / ID No *</label>
+                  <input type="text" id="reg-roll" required placeholder="e.g. DOT-01" 
+                         class="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Batch / Class</label>
+                  <input type="text" id="reg-batch" placeholder="e.g. Java Morning" 
+                         class="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Parent WhatsApp Number *</label>
+                <div class="relative flex items-center">
+                  <span class="inline-flex items-center px-4 py-3 rounded-l-xl border border-r-0 border-slate-700/80 bg-slate-900 text-emerald-400 font-bold text-sm">
+                    <i class="fa-brands fa-whatsapp mr-1.5 text-base"></i> +91
+                  </span>
+                  <input type="tel" id="reg-parent-phone" required maxlength="10" placeholder="10-digit number (e.g. 9893177887)" 
+                         class="w-full bg-slate-950 border border-slate-700/80 rounded-r-xl px-4 py-3 text-sm text-white font-mono focus:outline-none focus:border-emerald-500">
+                </div>
+                <p class="text-[11px] text-slate-500 mt-1">Country code (+91) applied automatically.</p>
+              </div>
+            </div>
+
+            <!-- Right: Camera Snapshot Box -->
+            <div class="space-y-3">
+              <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">Student Face Features *</label>
+              <div class="relative w-full aspect-video rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center">
+                <video id="reg-video" autoplay muted playsinline class="w-full h-full object-cover"></video>
+                <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div class="w-36 h-44 border-2 border-dashed border-emerald-400/80 rounded-2xl"></div>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between pt-1">
+                <button type="button" onclick="captureFaceForRegistration()" class="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold text-white flex items-center space-x-2 transition shadow">
+                  <i class="fa-solid fa-camera"></i>
+                  <span>Capture Face Features</span>
+                </button>
+                <span id="face-captured-indicator" class="text-xs font-semibold text-amber-400">
+                  <i class="fa-solid fa-circle-exclamation mr-1"></i> Not captured
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-4 border-t border-slate-800">
+            <button type="submit" id="btn-submit-reg" class="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 text-white font-extrabold rounded-2xl text-sm shadow-xl shadow-emerald-500/25 transition">
+              COMPLETE & REGISTER STUDENT
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- 3. ATTENDANCE LOGS VIEW (RESPONSIVE TABLE / CARDS) -->
+    <section id="tab-logs" class="hidden w-full max-w-5xl mx-auto space-y-4">
+      <div class="glass-card rounded-3xl p-6 md:p-8 border border-slate-800 shadow-2xl space-y-5">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div>
+            <h2 class="text-lg font-extrabold text-white">Today's Attendance Feed</h2>
+            <p class="text-xs text-slate-400 mt-0.5">Live entry and departure log with WhatsApp confirmation</p>
+          </div>
+          <button onclick="loadAttendanceLogs()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-semibold text-slate-200 transition">
+            <i class="fa-solid fa-rotate mr-1.5"></i> Refresh
+          </button>
+        </div>
+
+        <div class="max-h-[500px] overflow-y-auto space-y-2.5 pr-2" id="logs-list-container">
+          <div class="text-center py-10 text-xs text-slate-500">Loading attendance records...</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= MOBILE BOTTOM NAVIGATION DOCK (ONLY ON PHONE / TABLET) ================= -->
+  <nav class="md:hidden glass-header px-6 py-2.5 border-t border-slate-800/80 sticky bottom-0 z-40">
+    <div class="max-w-md mx-auto grid grid-cols-3 gap-2">
+      <button id="nav-scan-btn" onclick="switchTab('scan')" class="py-2 rounded-2xl flex flex-col items-center justify-center text-emerald-400 font-bold transition">
+        <i class="fa-solid fa-camera text-base"></i>
+        <span class="text-[10px] tracking-wide mt-1">SCANNER</span>
+      </button>
+
+      <button id="nav-register-btn" onclick="switchTab('register')" class="py-2 rounded-2xl flex flex-col items-center justify-center text-slate-400 transition">
+        <i class="fa-solid fa-user-plus text-base"></i>
+        <span class="text-[10px] tracking-wide mt-1">REGISTER</span>
+      </button>
+
+      <button id="nav-logs-btn" onclick="switchTab('logs')" class="py-2 rounded-2xl flex flex-col items-center justify-center text-slate-400 transition">
+        <i class="fa-solid fa-list-check text-base"></i>
+        <span class="text-[10px] tracking-wide mt-1">LOGS</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- WhatsApp QR Code Modal -->
+  <div id="qr-modal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div class="glass-card border border-slate-700/80 rounded-3xl max-w-xs w-full p-6 text-center space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center">
+        <h3 class="font-extrabold text-white text-sm flex items-center">
+          <i class="fa-brands fa-whatsapp text-emerald-400 mr-2 text-base"></i> Link WhatsApp
+        </h3>
+        <button onclick="closeQRCodeModal()" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+      </div>
+      <p class="text-xs text-slate-400 leading-snug">Open WhatsApp on your phone ➔ Linked Devices ➔ Scan this QR code:</p>
+      <div class="bg-white p-3 rounded-2xl inline-block mx-auto shadow-inner">
+        <img id="qr-image" src="" alt="WhatsApp QR" class="w-48 h-48 mx-auto object-contain">
+      </div>
+      <p class="text-[10px] text-slate-500 font-medium">Auto-updates in real-time</p>
+    </div>
+  </div>
+
+  <!-- Student Leaving Confirmation Popup Modal -->
+  <div id="leave-confirm-modal" class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
+    <div class="glass-card border border-amber-500/40 rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
+      <div class="w-16 h-16 mx-auto rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-3xl">
+        <i class="fa-solid fa-person-walking-dashed-line-arrow-right"></i>
+      </div>
+      <div>
+        <h3 class="text-lg font-extrabold text-white" id="leave-student-name">Student Name</h3>
+        <p class="text-sm text-amber-400 font-semibold mt-1">is leaving the institute?</p>
+        <p class="text-xs text-slate-400 mt-2">
+          This will mark attendance as <strong>LEFT</strong> and send an exit message to their parent.
+        </p>
+      </div>
+      
+      <div class="grid grid-cols-2 gap-3 pt-2">
+        <button onclick="confirmStudentLeave()" class="py-3 px-4 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-extrabold rounded-xl text-xs shadow-lg shadow-amber-500/20 transition">
+          YES, LEAVING
+        </button>
+        <button onclick="cancelStudentLeave()" class="py-3 px-4 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 font-bold rounded-xl text-xs transition">
+          NO, CANCEL
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Server Config Modal -->
+  <div id="server-config-modal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div class="glass-card border border-slate-700/80 rounded-3xl max-w-xs w-full p-5 space-y-3.5 shadow-2xl">
+      <div class="flex justify-between items-center">
+        <h3 class="font-extrabold text-white text-sm flex items-center">
+          <i class="fa-solid fa-server text-emerald-400 mr-2"></i> Server Link
+        </h3>
+        <button onclick="closeServerConfigModal()" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+      </div>
+      <p class="text-[11px] text-slate-400">Target server host address:</p>
+      <input type="text" id="config-backend-url" placeholder="http://localhost:4000" 
+             class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500">
+      <div class="flex space-x-2 pt-1">
+        <button onclick="saveServerConfig()" class="flex-1 py-2.5 bg-emerald-600 rounded-xl text-xs font-bold text-white">Save</button>
+        <button onclick="resetServerConfig()" class="px-3 py-2.5 bg-slate-800 rounded-xl text-xs font-medium text-slate-300">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

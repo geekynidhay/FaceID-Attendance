@@ -1,0 +1,34 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+*.log
+
+# Databases & Session Stores
+*.db
+*.db-journal
+openwa-service/data/
+openwa-service/dist/
+
+# Android Studio & Build Artifacts
+android-kiosk-app/.gradle/
+android-kiosk-app/build/
+android-kiosk-app/app/build/
+android-kiosk-app/local.properties
+android-kiosk-app/.idea/
+*.apk
+
+# Mobile Expo
+mobile-attendance-app/.expo/
+mobile-attendance-app/dist/
+
+# macOS
+.DS_Store
+Thumbs.db
