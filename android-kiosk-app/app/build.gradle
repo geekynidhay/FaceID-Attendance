@@ -6,6 +6,19 @@ android {
     namespace 'com.apex.attendance'
     compileSdk 34
 
+    signingConfigs {
+        release {
+            storeFile file("../dotcmc-release-key.jks")
+            storePassword "dotcmc123"
+            keyAlias "dotcmc"
+            keyPassword "dotcmc123"
+            enableV1Signing true
+            enableV2Signing true
+            enableV3Signing true
+            enableV4Signing true
+        }
+    }
+
     defaultConfig {
         applicationId "com.apex.attendance"
         minSdk 24
@@ -15,11 +28,16 @@ android {
     }
 
     buildTypes {
+        debug {
+            signingConfig signingConfigs.release
+        }
         release {
             minifyEnabled false
+            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
@@ -32,4 +50,3 @@ dependencies {
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'androidx.webkit:webkit:1.8.0'
 }
-
