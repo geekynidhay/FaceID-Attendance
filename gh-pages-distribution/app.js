@@ -115,6 +115,15 @@ function resetServerConfig() {
   checkWhatsAppStatus();
 }
 
+// Auto-generate random unique Roll Number (e.g. DOT-8492)
+function generateAutoRollNumber() {
+  const rollInput = document.getElementById('reg-roll');
+  if (rollInput) {
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    rollInput.value = `DOT-${randomSuffix}`;
+  }
+}
+
 // Switch Tabs
 function switchTab(tabId) {
   ['scan', 'register', 'logs'].forEach(tab => {
@@ -147,6 +156,7 @@ function switchTab(tabId) {
 
   if (tabId === 'register') {
     startRegisterCamera();
+    generateAutoRollNumber();
   } else if (tabId === 'scan') {
     startScannerCamera();
   } else if (tabId === 'logs') {

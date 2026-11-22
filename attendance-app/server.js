@@ -253,4 +253,39 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Attendance System running on: http://localhost:${PORT}`);
   console.log(`📱 Access on Mobile via Local Wi-Fi: http://<YOUR_PC_IP>:${PORT}`);
   console.log(`=================================================`);
+
+  // Start UDP Discovery Beacon on Local Wi-Fi
+  startUdpDiscoveryBeacon();
 });
+
+// ================= ZERO-CONFIG UDP LOCAL DISCOVERY ================= //
+function startUdpDiscoveryBeacon() {
+  const dgram = require('dgram');
+  const server = dgram.createSocket('udp4');
+  const DISCOVERY_PORT = 41234;
+
+  server.on('error', (err) => {
+    console.error(`[UDP Discovery Error]:\n${err.stack}`);
+    server.close();
+  });
+
+  server.on('message', (msg, rinfo) => {
+    const text = msg.toString().trim();
+    if (text === 'DISCOVER_APEX_ATTENDANCE_SERVER') {
+      const response = JSON.stringify({
+        service: 'DOT_CMC_ATTENDANCE',
+        port: PORT
+      });
+      server.send(response, rinfo.port, rinfo.address, (err) => {
+        if (!err) {
+          console.log(`[Zero-Config Auto-Discovery] Dispatched server IP to phone at ${rinfo.address}:${rinfo.port}`);
+        }
+      });
+    }
+  });
+
+  server.bind(DISCOVERY_PORT, '0.0.0.0', () => {
+    server.setBroadcast(true);
+    console.log(`📡 Zero-Config Auto-Discovery Beacon active on UDP port ${DISCOVERY_PORT}`);
+  });
+}
