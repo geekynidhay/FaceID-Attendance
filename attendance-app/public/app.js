@@ -16,6 +16,10 @@ let activeRemoteCapturePolling = null;
 let currentIncomingSnapTask = null;
 let snapCameraStream = null;
 
+// Cache for all loaded students (for filtering/search and Excel export)
+let allStudentsCache = [];
+let allBatchesCache = [];
+
 // Initialize Device Identity
 function initDeviceIdentity() {
   if (!deviceId) {
@@ -33,6 +37,9 @@ function initDeviceIdentity() {
     }
     localStorage.setItem('apex_device_name', deviceName);
   }
+
+  const nameDisplay = document.getElementById('device-name-display');
+  if (nameDisplay) nameDisplay.innerText = deviceName;
 
   // Hide remote staff phone selector on mobile phones
   const remoteToggleGroup = document.getElementById('remote-capture-toggle-group');
@@ -57,12 +64,10 @@ async function sendDeviceHeartbeat() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ device_id: deviceId, device_name: deviceName })
     });
-  } catch (e) {
-    // Silent fail if offline
-  }
+  } catch (e) {}
 }
 
-// Dynamic Backend URL (supports both same-origin local & GitHub Pages pointing to remote server)
+// Dynamic Backend URL
 function getApiBaseUrl() {
   const savedUrl = localStorage.getItem('custom_backend_url');
   if (savedUrl && savedUrl.trim() !== '') {
@@ -83,7 +88,6 @@ const loaderStatus = document.getElementById('loader-status');
 const scannerStatusText = document.getElementById('scanner-status-text');
 const checkinBlank = document.getElementById('checkin-blank');
 const checkinResult = document.getElementById('checkin-result');
-const facesCountSpan = document.getElementById('faces-count');
 const scannerLaser = document.getElementById('scanner-laser');
 
 // Initialize on page load
@@ -106,15 +110,15 @@ window.addEventListener('DOMContentLoaded', async () => {
   });
 
   generateAutoRollNumber();
+  await loadBatches();
   await loadAIModels();
   await reloadRegisteredFaces();
   await checkWhatsAppStatus();
   startScannerCamera();
 
-  // Hide animated scanner laser until scanning is triggered
   if (scannerLaser) scannerLaser.style.display = 'none';
 
-  // Listen for Enter key anywhere on the page
+  // Listen for Enter key
   window.addEventListener('keydown', (e) => {
     const isScannerActive = !document.getElementById('tab-scan').classList.contains('hidden');
     const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
@@ -126,17 +130,20 @@ window.addEventListener('DOMContentLoaded', async () => {
   });
 });
 
-// Install PWA Trigger
-function promptInstallPWA() {
-  if (deferredPrompt) {
-    deferredPrompt.prompt();
-    deferredPrompt.userChoice.then((choiceResult) => {
-      if (choiceResult.outcome === 'accepted') {
-        console.log('User installed the Attendance App');
-        document.getElementById('btn-install-app').classList.add('hidden');
-      }
-      deferredPrompt = null;
-    });
+// Toggle 2nd Mobile Number Field
+function toggleSecondaryPhoneField() {
+  const secContainer = document.getElementById('secondary-phone-container');
+  const secInput = document.getElementById('reg-secondary-phone');
+  const btnToggle = document.getElementById('btn-toggle-secondary-phone');
+
+  if (secContainer.classList.contains('hidden')) {
+    secContainer.classList.remove('hidden');
+    btnToggle.classList.add('hidden');
+    secInput.focus();
+  } else {
+    secContainer.classList.add('hidden');
+    btnToggle.classList.remove('hidden');
+    secInput.value = '';
   }
 }
 
@@ -160,6 +167,7 @@ function saveServerConfig() {
   closeServerConfigModal();
   reloadRegisteredFaces();
   checkWhatsAppStatus();
+  loadBatches();
 }
 
 function resetServerConfig() {
@@ -168,6 +176,7 @@ function resetServerConfig() {
   closeServerConfigModal();
   reloadRegisteredFaces();
   checkWhatsAppStatus();
+  loadBatches();
 }
 
 // Auto-generate random unique Roll Number (e.g. DOT-8492)
@@ -179,18 +188,18 @@ function generateAutoRollNumber() {
   }
 }
 
-// Switch Tabs
+// Switch Main Tabs
 function switchTab(tabId) {
   ['scan', 'register', 'logs'].forEach(tab => {
     document.getElementById(`tab-${tab}`).classList.add('hidden');
     
-    // Update Mobile Nav
+    // Mobile Nav
     const mobBtn = document.getElementById(`nav-${tab}-btn`);
     if (mobBtn) {
       mobBtn.className = "py-2 rounded-2xl flex flex-col items-center justify-center text-slate-400 transition";
     }
 
-    // Update Desktop Nav
+    // Desktop Nav
     const webBtn = document.getElementById(`web-nav-${tab}-btn`);
     if (webBtn) {
       webBtn.className = "px-5 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition";
@@ -213,32 +222,49 @@ function switchTab(tabId) {
     startRegisterCamera();
     generateAutoRollNumber();
     refreshOnlineStaffPhones();
+    loadBatches();
   } else if (tabId === 'scan') {
     startScannerCamera();
   } else if (tabId === 'logs') {
     loadAdminStudents();
+    loadBatches();
     loadAttendanceLogs();
   }
 }
 
-// Admin Sub-Tab Switching (Students vs Logs)
+// Admin Sub-Tab Switching (Students vs Batches vs Logs)
 function switchAdminSubTab(subTab) {
   const studentsView = document.getElementById('admin-view-students');
+  const batchesView = document.getElementById('admin-view-batches');
   const logsView = document.getElementById('admin-view-logs');
+  const searchContainer = document.getElementById('admin-search-container');
+
   const btnStudents = document.getElementById('admin-sub-students');
+  const btnBatches = document.getElementById('admin-sub-batches');
   const btnLogs = document.getElementById('admin-sub-logs');
+
+  [btnStudents, btnBatches, btnLogs].forEach(b => {
+    if (b) b.className = "px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white font-semibold transition";
+  });
+
+  studentsView.classList.add('hidden');
+  batchesView.classList.add('hidden');
+  logsView.classList.add('hidden');
 
   if (subTab === 'students') {
     studentsView.classList.remove('hidden');
-    logsView.classList.add('hidden');
+    if (searchContainer) searchContainer.classList.remove('hidden');
     btnStudents.className = "px-3.5 py-1.5 rounded-lg bg-emerald-600 text-white font-bold transition";
-    btnLogs.className = "px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white font-semibold transition";
     loadAdminStudents();
+  } else if (subTab === 'batches') {
+    batchesView.classList.remove('hidden');
+    if (searchContainer) searchContainer.classList.add('hidden');
+    btnBatches.className = "px-3.5 py-1.5 rounded-lg bg-emerald-600 text-white font-bold transition";
+    loadBatches();
   } else {
-    studentsView.classList.add('hidden');
     logsView.classList.remove('hidden');
+    if (searchContainer) searchContainer.classList.add('hidden');
     btnLogs.className = "px-3.5 py-1.5 rounded-lg bg-emerald-600 text-white font-bold transition";
-    btnStudents.className = "px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white font-semibold transition";
     loadAttendanceLogs();
   }
 }
@@ -267,7 +293,6 @@ async function reloadRegisteredFaces() {
   try {
     const res = await fetch(`${getApiBaseUrl()}/api/students/descriptors`);
     const students = await res.json();
-    if (facesCountSpan) facesCountSpan.innerText = students.length;
 
     const adminCount = document.getElementById('admin-students-count');
     if (adminCount) adminCount.innerText = students.length;
@@ -275,7 +300,7 @@ async function reloadRegisteredFaces() {
     if (students.length > 0) {
       const labeledDescriptors = students.map(st => {
         const descriptorArray = new Float32Array(st.face_descriptor);
-        const label = `${st.id}::${st.name}::${st.roll_no}::${st.batch || ''}::${st.parent_phone}`;
+        const label = `${st.id}::${st.name}::${st.roll_no}::${st.batch || ''}::${st.parent_phone}::${st.secondary_phone || ''}`;
         return new faceapi.LabeledFaceDescriptors(label, [descriptorArray]);
       });
 
@@ -283,14 +308,13 @@ async function reloadRegisteredFaces() {
       console.log(`Face Matcher initialized with ${students.length} students.`);
     } else {
       faceMatcher = null;
-      console.log("No registered students found yet.");
     }
   } catch (err) {
     console.error("Error fetching student descriptors:", err);
   }
 }
 
-// 3. Start Camera for Scanner (with dynamic Front/Back facingMode)
+// 3. Start Camera for Scanner
 async function startScannerCamera() {
   if (currentCameraStream) {
     currentCameraStream.getTracks().forEach(track => track.stop());
@@ -309,8 +333,6 @@ async function startScannerCamera() {
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     currentCameraStream = stream;
     videoStream.srcObject = stream;
-
-    // Only mirror video if front-facing
     videoStream.style.transform = (currentFacingMode === 'user') ? 'scaleX(-1)' : 'scaleX(1)';
 
     videoStream.onloadedmetadata = () => {
@@ -322,7 +344,6 @@ async function startScannerCamera() {
   }
 }
 
-// Flip Camera between Hardware Front (Selfie) and Back (Environment) Cameras
 async function toggleCameraMirror() {
   currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
   scannerStatusText.innerText = `Switched to ${currentFacingMode === 'user' ? 'Front' : 'Back'} Camera...`;
@@ -413,7 +434,7 @@ async function triggerManualScan() {
   } finally {
     setTimeout(() => {
       if (scannerLaser && !isContinuousScanning) scannerLaser.style.display = 'none';
-      if (btn) btn.innerHTML = `<i class="fa-solid fa-expand mr-1.5 text-sm"></i> Scan Face (Press Enter)`;
+      if (btn) btn.innerHTML = `<i class="fa-solid fa-expand text-base"></i><span>Scan Face (Enter)</span>`;
       if (counter && !isContinuousScanning) counter.className = 'w-2 h-2 rounded-full bg-slate-500';
     }, 1200);
   }
@@ -449,12 +470,11 @@ function startContinuousLoop() {
 
 let pendingLeaveStudent = null;
 
-// 5. Handle Attendance Verification Flow (Entry vs Leaving Popup)
+// 5. Handle Attendance Verification Flow
 async function handleAttendanceTrigger(studentId, name, roll, batch, parentPhone) {
   isProcessingAttendance = true;
 
   try {
-    // Check student status: are they currently inside?
     const checkRes = await fetch(`${getApiBaseUrl()}/api/attendance/check-status`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -464,13 +484,11 @@ async function handleAttendanceTrigger(studentId, name, roll, batch, parentPhone
     const statusData = await checkRes.json();
 
     if (statusData.isInside) {
-      // Student is already inside! Show popup: "Rahul Sharma is leaving the institute?"
       pendingLeaveStudent = { studentId, name, roll, batch, parentPhone };
       showLeaveConfirmationPopup(name);
       return;
     }
 
-    // Student is not inside -> Mark ENTRY directly
     await executeAttendanceMark(studentId, 'ENTRY');
 
   } catch (err) {
@@ -479,13 +497,11 @@ async function handleAttendanceTrigger(studentId, name, roll, batch, parentPhone
   }
 }
 
-// Show Leave Confirmation Modal
 function showLeaveConfirmationPopup(studentName) {
   document.getElementById('leave-student-name').innerText = studentName;
   document.getElementById('leave-confirm-modal').classList.remove('hidden');
 }
 
-// Cancel Leave Confirmation
 function cancelStudentLeave() {
   document.getElementById('leave-confirm-modal').classList.add('hidden');
   pendingLeaveStudent = null;
@@ -494,7 +510,6 @@ function cancelStudentLeave() {
   }, 1000);
 }
 
-// Confirm Leave Action
 async function confirmStudentLeave() {
   document.getElementById('leave-confirm-modal').classList.add('hidden');
   if (pendingLeaveStudent) {
@@ -506,7 +521,6 @@ async function confirmStudentLeave() {
   }
 }
 
-// Execute Attendance API call (ENTRY or EXIT)
 async function executeAttendanceMark(studentId, actionType) {
   try {
     const res = await fetch(`${getApiBaseUrl()}/api/attendance/mark`, {
@@ -528,7 +542,6 @@ async function executeAttendanceMark(studentId, actionType) {
   }
 }
 
-// Show Confirmation Card at top of scanner
 function showCheckinSuccess(data) {
   checkinBlank.classList.add('hidden');
   checkinResult.classList.remove('hidden');
@@ -536,9 +549,13 @@ function showCheckinSuccess(data) {
   const isExit = data.type === 'EXIT';
 
   document.getElementById('res-student-name').innerText = data.student.name;
-  document.getElementById('res-roll-batch').innerText = `${data.student.batch || 'General Batch'} • ${isExit ? 'LEFT INSTITUTE' : 'ENTERED INSTITUTE'}`;
+  document.getElementById('res-roll-batch').innerText = `${data.student.batch || 'Basic Computer'} • ${isExit ? 'LEFT INSTITUTE' : 'ENTERED INSTITUTE'}`;
   document.getElementById('res-checkin-time').innerText = `${data.time || new Date().toLocaleTimeString()}`;
-  document.getElementById('res-parent-phone').innerText = data.student.parent_phone;
+  
+  const phoneText = data.student.secondary_phone 
+    ? `${data.student.parent_phone}, ${data.student.secondary_phone}`
+    : data.student.parent_phone;
+  document.getElementById('res-parent-phone').innerText = phoneText;
 
   const waBadge = document.getElementById('res-wa-badge');
 
@@ -587,7 +604,6 @@ async function startRegisterCamera() {
   }
 }
 
-// Switch between "This PC" local camera & "Staff Phone"
 function setCaptureMode(mode) {
   const localContainer = document.getElementById('local-capture-container');
   const remoteContainer = document.getElementById('remote-capture-container');
@@ -609,7 +625,6 @@ function setCaptureMode(mode) {
   }
 }
 
-// Fetch list of online staff phones for remote capture dropdown
 async function refreshOnlineStaffPhones() {
   const select = document.getElementById('select-remote-device');
   if (!select) return;
@@ -617,8 +632,6 @@ async function refreshOnlineStaffPhones() {
   try {
     const res = await fetch(`${getApiBaseUrl()}/api/devices/list`);
     const devices = await res.json();
-
-    // Filter out our own device id
     const otherDevices = devices.filter(d => d.id !== deviceId);
 
     if (otherDevices.length === 0) {
@@ -633,7 +646,7 @@ async function refreshOnlineStaffPhones() {
   }
 }
 
-// Send Remote Snap Request to Staff Phone
+// Remote Snap Request
 let activeRemoteRequestId = null;
 let remoteStatusPollTimer = null;
 
@@ -673,7 +686,6 @@ async function dispatchRemoteCaptureRequest() {
 
     activeRemoteRequestId = data.requestId;
 
-    // Start polling status
     if (remoteStatusPollTimer) clearInterval(remoteStatusPollTimer);
     remoteStatusPollTimer = setInterval(pollRemoteCaptureStatus, 1500);
 
@@ -685,7 +697,6 @@ async function dispatchRemoteCaptureRequest() {
   }
 }
 
-// Poll status of remote capture
 async function pollRemoteCaptureStatus() {
   if (!activeRemoteRequestId) return;
 
@@ -716,11 +727,10 @@ async function pollRemoteCaptureStatus() {
   } catch (e) {}
 }
 
-// ================= PHONE RECEIVER: REMOTE SNAP POPUP ================= //
+// Phone Receiver for Remote Snap Popup
 function startListeningForRemoteSnapRequests() {
   if (activeRemoteCapturePolling) clearInterval(activeRemoteCapturePolling);
   activeRemoteCapturePolling = setInterval(async () => {
-    // Only poll if snap modal is not currently open
     const modal = document.getElementById('incoming-snap-modal');
     if (!modal.classList.contains('hidden')) return;
 
@@ -739,7 +749,6 @@ async function showRemoteSnapModal(task) {
   document.getElementById('snap-target-name').innerText = task.student_name;
   document.getElementById('incoming-snap-modal').classList.remove('hidden');
 
-  // Start phone camera for snap modal
   try {
     const snapVid = document.getElementById('snap-phone-video');
     snapCameraStream = await navigator.mediaDevices.getUserMedia({
@@ -842,12 +851,17 @@ async function handleRegistration(e) {
     return;
   }
 
+  const primaryPhone = document.getElementById('reg-parent-phone').value.trim();
+  const secondaryPhone = document.getElementById('reg-secondary-phone').value.trim();
+
   const payload = {
-    name: document.getElementById('reg-name').value,
-    roll_no: document.getElementById('reg-roll').value,
-    batch: document.getElementById('reg-batch').value,
-    parent_name: '',
-    parent_phone: document.getElementById('reg-parent-phone').value,
+    name: document.getElementById('reg-name').value.trim(),
+    roll_no: document.getElementById('reg-roll').value.trim(),
+    batch: document.getElementById('reg-batch').value || 'Basic Computer',
+    father_name: document.getElementById('reg-father').value.trim(),
+    mother_name: document.getElementById('reg-mother').value.trim(),
+    parent_phone: primaryPhone,
+    secondary_phone: secondaryPhone,
     face_descriptor: capturedRegistrationDescriptor
   };
 
@@ -865,21 +879,20 @@ async function handleRegistration(e) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Registration failed");
 
-    alert(`Student "${payload.name}" registered successfully!\nWelcome message dispatched to parent.`);
+    alert(`Student "${payload.name}" registered successfully!\nWelcome message dispatched to parent(s).`);
     document.getElementById('register-form').reset();
     capturedRegistrationDescriptor = null;
     document.getElementById('face-captured-indicator').innerHTML = `<span class="text-amber-400"><i class="fa-solid fa-circle-exclamation mr-1"></i> Not captured</span>`;
 
-    // Reset remote status banner if visible
+    // Hide secondary phone container
+    document.getElementById('secondary-phone-container').classList.add('hidden');
+    document.getElementById('btn-toggle-secondary-phone').classList.remove('hidden');
+
     const banner = document.getElementById('remote-status-banner');
     if (banner) banner.classList.add('hidden');
 
-    // Generate fresh auto roll number
     generateAutoRollNumber();
-
-    // Refresh facial descriptors in matcher
     await reloadRegisteredFaces();
-    // Switch to scanner
     switchTab('scan');
   } catch (err) {
     alert("Error: " + err.message);
@@ -889,7 +902,105 @@ async function handleRegistration(e) {
   }
 }
 
-// 7. Admin Mode: Registered Students Directory
+// ================= BATCHES MANAGEMENT ================= //
+async function loadBatches() {
+  try {
+    const res = await fetch(`${getApiBaseUrl()}/api/batches/list`);
+    const batches = await res.json();
+    allBatchesCache = batches;
+
+    // 1. Populate Register Form Batch Select
+    const regBatchSelect = document.getElementById('reg-batch');
+    if (regBatchSelect) {
+      const currentVal = regBatchSelect.value;
+      regBatchSelect.innerHTML = batches.map(b => `
+        <option value="${b.name}">${b.name}</option>
+      `).join('');
+      if (currentVal && batches.some(b => b.name === currentVal)) {
+        regBatchSelect.value = currentVal;
+      }
+    }
+
+    // 2. Populate Edit Modal Batch Select
+    const editBatchSelect = document.getElementById('edit-student-batch');
+    if (editBatchSelect) {
+      editBatchSelect.innerHTML = batches.map(b => `
+        <option value="${b.name}">${b.name}</option>
+      `).join('');
+    }
+
+    // 3. Render Batches List in Admin Mode
+    const container = document.getElementById('batches-list-container');
+    if (container) {
+      if (batches.length === 0) {
+        container.innerHTML = `<div class="text-xs text-slate-500 py-3">No batches created yet. Add one above.</div>`;
+      } else {
+        container.innerHTML = batches.map(b => `
+          <div class="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+            <div class="flex items-center space-x-2.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+              <span class="text-xs md:text-sm font-bold text-white">${b.name}</span>
+            </div>
+            <button onclick="deleteBatch(${b.id}, '${b.name.replace(/'/g, "\\'")}')" class="px-2.5 py-1 rounded-xl bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 text-xs font-semibold transition">
+              <i class="fa-solid fa-trash-can mr-1"></i> Delete
+            </button>
+          </div>
+        `).join('');
+      }
+    }
+  } catch (err) {
+    console.error("Error loading batches:", err);
+  }
+}
+
+async function addNewBatch() {
+  const input = document.getElementById('new-batch-name');
+  const name = input ? input.value.trim() : '';
+
+  if (!name) {
+    alert("Please enter a batch name!");
+    input?.focus();
+    return;
+  }
+
+  try {
+    const res = await fetch(`${getApiBaseUrl()}/api/batches/add`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Failed to add batch");
+
+    input.value = '';
+    await loadBatches();
+    alert(`Batch "${name}" added successfully!`);
+  } catch (err) {
+    alert("Error adding batch: " + err.message);
+  }
+}
+
+async function deleteBatch(id, name) {
+  if (!confirm(`Are you sure you want to remove batch "${name}"?`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`${getApiBaseUrl()}/api/batches/${id}`, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    if (data.success) {
+      await loadBatches();
+    } else {
+      alert("Failed to delete batch: " + (data.error || "Unknown error"));
+    }
+  } catch (err) {
+    alert("Error deleting batch: " + err.message);
+  }
+}
+
+// ================= ADMIN MODE: REGISTERED STUDENTS & EDITING ================= //
 async function loadAdminStudents() {
   const container = document.getElementById('admin-students-list');
   if (!container) return;
@@ -898,47 +1009,158 @@ async function loadAdminStudents() {
   try {
     const res = await fetch(`${getApiBaseUrl()}/api/students/list`);
     const students = await res.json();
+    allStudentsCache = students;
 
     const countEl = document.getElementById('admin-students-count');
     if (countEl) countEl.innerText = students.length;
 
-    if (students.length === 0) {
-      container.innerHTML = `<div class="text-center py-8 text-xs text-slate-500">No students registered yet. Register a student to view them here.</div>`;
-      return;
-    }
-
-    container.innerHTML = students.map(st => `
-      <div class="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800/80 flex items-center justify-between hover:border-slate-700 transition">
-        <div class="flex items-center space-x-3">
-          <div class="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-black">
-            ${st.name.charAt(0)}
-          </div>
-          <div>
-            <h4 class="text-xs md:text-sm font-extrabold text-white leading-tight">${st.name}</h4>
-            <div class="flex items-center space-x-2 text-[10px] text-slate-400 font-mono mt-0.5">
-              <span class="text-emerald-400 font-bold">${st.roll_no}</span>
-              <span>•</span>
-              <span>${st.batch || 'General'}</span>
-              <span>•</span>
-              <span><i class="fa-brands fa-whatsapp text-emerald-400"></i> ${st.parent_phone}</span>
-            </div>
-          </div>
-        </div>
-
-        <button onclick="deleteStudent(${st.id}, '${st.name.replace(/'/g, "\\'")}')" class="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 text-xs font-bold transition flex items-center space-x-1.5">
-          <i class="fa-solid fa-trash-can text-xs"></i>
-          <span class="hidden sm:inline">Delete</span>
-        </button>
-      </div>
-    `).join('');
+    renderStudentsList(students);
   } catch (err) {
     container.innerHTML = `<div class="text-center py-6 text-xs text-rose-400">Failed to load student directory.</div>`;
   }
 }
 
+function renderStudentsList(students) {
+  const container = document.getElementById('admin-students-list');
+  if (!container) return;
+
+  if (students.length === 0) {
+    container.innerHTML = `<div class="text-center py-8 text-xs text-slate-500">No students registered yet.</div>`;
+    return;
+  }
+
+  container.innerHTML = students.map(st => {
+    const phoneList = [st.parent_phone];
+    if (st.secondary_phone) phoneList.push(st.secondary_phone);
+
+    const parentsInfo = [];
+    if (st.father_name) parentsInfo.push(`F: ${st.father_name}`);
+    if (st.mother_name) parentsInfo.push(`M: ${st.mother_name}`);
+    const parentsStr = parentsInfo.length > 0 ? `• ${parentsInfo.join(', ')}` : '';
+
+    return `
+      <div class="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800/80 flex flex-wrap items-center justify-between gap-3 hover:border-slate-700 transition">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-sm font-black">
+            ${st.name.charAt(0)}
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <h4 class="text-xs md:text-sm font-extrabold text-white leading-tight">${st.name}</h4>
+              <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-800 text-teal-300 font-mono">
+                ${st.roll_no}
+              </span>
+            </div>
+            <div class="flex flex-wrap items-center space-x-2 text-[10px] text-slate-400 font-mono mt-1">
+              <span class="text-emerald-400 font-semibold">${st.batch || 'Basic Computer'}</span>
+              <span>${parentsStr}</span>
+              <span>•</span>
+              <span class="text-slate-300"><i class="fa-brands fa-whatsapp text-emerald-400"></i> ${phoneList.join(', ')}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+          <button onclick="openEditStudentModal(${st.id})" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition flex items-center space-x-1.5">
+            <i class="fa-solid fa-pen-to-square text-xs text-emerald-400"></i>
+            <span>Edit</span>
+          </button>
+          <button onclick="deleteStudent(${st.id}, '${st.name.replace(/'/g, "\\'")}')" class="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 text-xs font-bold transition flex items-center space-x-1.5">
+            <i class="fa-solid fa-trash-can text-xs"></i>
+            <span class="hidden sm:inline">Delete</span>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterAdminStudents() {
+  const query = (document.getElementById('admin-student-search')?.value || '').toLowerCase().trim();
+  if (!query) {
+    renderStudentsList(allStudentsCache);
+    return;
+  }
+
+  const filtered = allStudentsCache.filter(st => {
+    return (st.name && st.name.toLowerCase().includes(query)) ||
+           (st.roll_no && st.roll_no.toLowerCase().includes(query)) ||
+           (st.batch && st.batch.toLowerCase().includes(query)) ||
+           (st.parent_phone && st.parent_phone.includes(query)) ||
+           (st.secondary_phone && st.secondary_phone.includes(query)) ||
+           (st.father_name && st.father_name.toLowerCase().includes(query)) ||
+           (st.mother_name && st.mother_name.toLowerCase().includes(query));
+  });
+
+  renderStudentsList(filtered);
+}
+
+// Student Edit Modal
+function openEditStudentModal(studentId) {
+  const student = allStudentsCache.find(s => s.id === studentId);
+  if (!student) return;
+
+  document.getElementById('edit-student-id').value = student.id;
+  document.getElementById('edit-student-name').value = student.name || '';
+  document.getElementById('edit-student-roll').value = student.roll_no || '';
+  document.getElementById('edit-student-father').value = student.father_name || '';
+  document.getElementById('edit-student-mother').value = student.mother_name || '';
+  document.getElementById('edit-student-phone').value = student.parent_phone || '';
+  document.getElementById('edit-student-sec-phone').value = student.secondary_phone || '';
+
+  const batchSelect = document.getElementById('edit-student-batch');
+  if (batchSelect) {
+    batchSelect.value = student.batch || 'Basic Computer';
+  }
+
+  document.getElementById('edit-student-modal').classList.remove('hidden');
+}
+
+function closeEditStudentModal() {
+  document.getElementById('edit-student-modal').classList.add('hidden');
+}
+
+async function saveStudentEdits(e) {
+  e.preventDefault();
+
+  const studentId = document.getElementById('edit-student-id').value;
+  const payload = {
+    name: document.getElementById('edit-student-name').value.trim(),
+    batch: document.getElementById('edit-student-batch').value,
+    father_name: document.getElementById('edit-student-father').value.trim(),
+    mother_name: document.getElementById('edit-student-mother').value.trim(),
+    parent_phone: document.getElementById('edit-student-phone').value.trim(),
+    secondary_phone: document.getElementById('edit-student-sec-phone').value.trim()
+  };
+
+  const btn = document.getElementById('btn-save-edit');
+  btn.disabled = true;
+  btn.innerText = "Saving...";
+
+  try {
+    const res = await fetch(`${getApiBaseUrl()}/api/students/${studentId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Update failed");
+
+    closeEditStudentModal();
+    await reloadRegisteredFaces();
+    await loadAdminStudents();
+    alert("Student details updated successfully!");
+  } catch (err) {
+    alert("Error updating student: " + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerText = "Save Changes";
+  }
+}
+
 // Delete student
 async function deleteStudent(studentId, name) {
-  if (!confirm(`Are you sure you want to remove student "${name}"? This will delete their face profile.`)) {
+  if (!confirm(`Are you sure you want to remove student "${name}"? This will delete their facial profile.`)) {
     return;
   }
 
@@ -956,6 +1178,54 @@ async function deleteStudent(studentId, name) {
   } catch (err) {
     alert("Error deleting student: " + err.message);
   }
+}
+
+// ================= EXPORT TO EXCEL ================= //
+function exportStudentsToExcel() {
+  if (!allStudentsCache || allStudentsCache.length === 0) {
+    alert("No student records available to export!");
+    return;
+  }
+
+  if (typeof XLSX === 'undefined') {
+    alert("Excel export library is loading. Please check internet connection.");
+    return;
+  }
+
+  // Format student records for Excel spreadsheet
+  const excelData = allStudentsCache.map((st, index) => ({
+    "S.No": index + 1,
+    "Roll No": st.roll_no || '',
+    "Student Name": st.name || '',
+    "Batch / Course": st.batch || 'Basic Computer',
+    "Father Name": st.father_name || '',
+    "Mother Name": st.mother_name || '',
+    "Primary Phone": st.parent_phone || '',
+    "Secondary Phone": st.secondary_phone || '',
+    "Registration Date": st.created_at ? new Date(st.created_at).toLocaleDateString() : ''
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+  // Set column widths for readability
+  worksheet['!cols'] = [
+    { wch: 6 },  // S.No
+    { wch: 12 }, // Roll No
+    { wch: 22 }, // Student Name
+    { wch: 18 }, // Batch
+    { wch: 20 }, // Father Name
+    { wch: 20 }, // Mother Name
+    { wch: 16 }, // Primary Phone
+    { wch: 16 }, // Secondary Phone
+    { wch: 16 }  // Registration Date
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Students");
+
+  const today = new Date().toISOString().split('T')[0];
+  const filename = `DOT_CMC_Students_${today}.xlsx`;
+  XLSX.writeFile(workbook, filename);
 }
 
 // 8. Load Attendance Logs
@@ -1012,7 +1282,7 @@ async function loadAttendanceLogs() {
   }
 }
 
-// 9. Check WhatsApp Service Status
+// 9. WhatsApp Status & QR Code
 let qrPollingInterval = null;
 
 async function checkWhatsAppStatus() {

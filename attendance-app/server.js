@@ -100,8 +100,44 @@ app.get('/api/remote-capture/status/:requestId', (req, res) => {
 });
 
 /**
- * Delete Student (Admin Mode)
+ * ================= BATCHES MANAGEMENT API =================
  */
+app.get('/api/batches/list', (req, res) => {
+  db.all('SELECT * FROM batches ORDER BY id ASC', [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/batches/add', (req, res) => {
+  const { name } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'Batch name is required' });
+  }
+  db.run('INSERT INTO batches (name) VALUES (?)', [name.trim()], function(err) {
+    if (err) {
+      if (err.message.includes('UNIQUE')) {
+        return res.status(400).json({ error: 'Batch already exists' });
+      }
+      return res.status(500).json({ error: err.message });
+    }
+    res.json({ success: true, id: this.lastID, name: name.trim() });
+  });
+});
+
+app.delete('/api/batches/:id', (req, res) => {
+  const { id } = req.params;
+  db.run('DELETE FROM batches WHERE id = ?', [id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, deleted: this.changes });
+  });
+});
+
+/**
+ * ================= STUDENTS MANAGEMENT API =================
+ */
+
+// Delete Student
 app.delete('/api/students/:id', (req, res) => {
   const { id } = req.params;
   db.run('DELETE FROM students WHERE id = ?', [id], function(err) {
@@ -110,21 +146,69 @@ app.delete('/api/students/:id', (req, res) => {
   });
 });
 
-/**
- * Get all students list for Admin Mode
- */
+// Update Student (Admin Mode Edit)
+app.put('/api/students/:id', (req, res) => {
+  const { id } = req.params;
+  const { name, batch, father_name, mother_name, parent_phone, secondary_phone } = req.body;
+
+  if (!name || !parent_phone) {
+    return res.status(400).json({ error: 'Name and Parent Phone are required' });
+  }
+
+  const query = `
+    UPDATE students
+    SET name = ?, batch = ?, father_name = ?, mother_name = ?, parent_phone = ?, secondary_phone = ?
+    WHERE id = ?
+  `;
+
+  db.run(query, [
+    name.trim(),
+    batch || 'Basic Computer',
+    father_name ? father_name.trim() : null,
+    mother_name ? mother_name.trim() : null,
+    parent_phone.trim(),
+    secondary_phone ? secondary_phone.trim() : null,
+    id
+  ], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, updated: this.changes });
+  });
+});
+
+// Descriptors for facial recognition
+app.get('/api/students/descriptors', (req, res) => {
+  const query = `
+    SELECT id, name, roll_no, batch, parent_phone, secondary_phone, face_descriptor 
+    FROM students
+  `;
+  db.all(query, [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    const formatted = rows.map(r => ({
+      ...r,
+      face_descriptor: JSON.parse(r.face_descriptor)
+    }));
+    res.json(formatted);
+  });
+});
+
+// Full Student List for Admin Mode & Export
 app.get('/api/students/list', (req, res) => {
-  db.all('SELECT id, name, roll_no, batch, parent_name, parent_phone, created_at FROM students ORDER BY id DESC', [], (err, rows) => {
+  const query = `
+    SELECT id, name, roll_no, batch, father_name, mother_name, parent_phone, secondary_phone, created_at 
+    FROM students 
+    ORDER BY id DESC
+  `;
+  db.all(query, [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });
 });
 
-/**
- * 1. Register a new student with face descriptor
- */
+// Register New Student
 app.post('/api/students/register', (req, res) => {
-  const { name, roll_no, batch, parent_name, parent_phone, face_descriptor, photo_url } = req.body;
+  const { name, roll_no, batch, father_name, mother_name, parent_phone, secondary_phone, face_descriptor, photo_url } = req.body;
 
   if (!name || !roll_no || !parent_phone || !face_descriptor) {
     return res.status(400).json({ 
@@ -132,17 +216,26 @@ app.post('/api/students/register', (req, res) => {
     });
   }
 
-  // Ensure face_descriptor is stringified array
   const descriptorStr = typeof face_descriptor === 'string' 
     ? face_descriptor 
     : JSON.stringify(face_descriptor);
 
   const query = `
-    INSERT INTO students (name, roll_no, batch, parent_name, parent_phone, face_descriptor, photo_url)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO students (name, roll_no, batch, father_name, mother_name, parent_phone, secondary_phone, face_descriptor, photo_url)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
-  db.run(query, [name.trim(), roll_no.trim(), batch, parent_name, parent_phone.trim(), descriptorStr, photo_url], function(err) {
+  db.run(query, [
+    name.trim(), 
+    roll_no.trim(), 
+    batch || 'Basic Computer', 
+    father_name ? father_name.trim() : null, 
+    mother_name ? mother_name.trim() : null, 
+    parent_phone.trim(), 
+    secondary_phone ? secondary_phone.trim() : null, 
+    descriptorStr, 
+    photo_url
+  ], function(err) {
     if (err) {
       if (err.message.includes('UNIQUE constraint failed')) {
         return res.status(400).json({ error: 'A student with this Roll No already exists!' });
@@ -150,8 +243,8 @@ app.post('/api/students/register', (req, res) => {
       return res.status(500).json({ error: err.message });
     }
 
-    // Send Welcome WhatsApp Message to parent in background
-    sendWelcomeRegistrationAlert(name.trim(), parent_phone.trim())
+    // Send Welcome WhatsApp Message to primary (+ secondary if available) in background
+    sendWelcomeRegistrationAlert(name.trim(), parent_phone.trim(), secondary_phone ? secondary_phone.trim() : null)
       .catch(wErr => console.error('Error sending welcome WhatsApp:', wErr));
 
     res.json({
@@ -163,80 +256,51 @@ app.post('/api/students/register', (req, res) => {
 });
 
 /**
- * 2. Get all students face descriptors for matching
+ * ================= ATTENDANCE VERIFICATION & CHECKIN =================
  */
-app.get('/api/students/descriptors', (req, res) => {
-  db.all('SELECT id, name, roll_no, batch, parent_phone, face_descriptor FROM students', [], (err, rows) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    const students = rows.map(r => ({
-      ...r,
-      face_descriptor: JSON.parse(r.face_descriptor)
-    }));
-    res.json(students);
-  });
-});
 
-/**
- * 3. Check student status (Entered vs Left)
- */
+// Check student status: are they currently inside?
 app.post('/api/attendance/check-status', (req, res) => {
   const { student_id } = req.body;
   if (!student_id) return res.status(400).json({ error: 'student_id required' });
 
-  // Get last action for this student today
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const startOfDayStr = startOfDay.toISOString().replace('T', ' ').substring(0, 19);
+
   const query = `
-    SELECT * FROM attendance_logs 
-    WHERE student_id = ? 
+    SELECT type, timestamp FROM attendance_logs 
+    WHERE student_id = ? AND timestamp >= ?
     ORDER BY id DESC LIMIT 1
   `;
 
-  db.get(query, [student_id], (err, lastLog) => {
+  db.get(query, [student_id, startOfDayStr], (err, lastLog) => {
     if (err) return res.status(500).json({ error: err.message });
-
-    db.get('SELECT * FROM students WHERE id = ?', [student_id], (sErr, student) => {
-      if (sErr || !student) return res.status(404).json({ error: 'Student not found' });
-
-      // If no log or last log was EXIT, next action is ENTRY
-      // If last log was ENTRY, student is currently inside, so next action is LEAVE (requires confirmation)
-      const isInside = lastLog && (lastLog.type === 'ENTRY' || !lastLog.type);
-
-      res.json({
-        student: {
-          id: student.id,
-          name: student.name,
-          roll_no: student.roll_no,
-          batch: student.batch,
-          parent_phone: student.parent_phone
-        },
-        isInside: !!isInside,
-        lastLog: lastLog || null
-      });
+    const isInside = (lastLog && lastLog.type === 'ENTRY');
+    res.json({
+      isInside,
+      lastAction: lastLog ? lastLog.type : null,
+      lastTimestamp: lastLog ? lastLog.timestamp : null
     });
   });
 });
 
-/**
- * 4. Mark attendance (ENTRY or EXIT) upon confirmation
- */
-app.post('/api/attendance/mark', async (req, res) => {
+// Mark Attendance (ENTRY or EXIT)
+app.post('/api/attendance/mark', (req, res) => {
   const { student_id, action_type } = req.body;
 
   if (!student_id) {
-    return res.status(400).json({ error: 'student_id is required' });
+    return res.status(400).json({ error: 'Missing student_id' });
   }
 
-  // Fetch student info
   db.get('SELECT * FROM students WHERE id = ?', [student_id], async (err, student) => {
     if (err || !student) {
       return res.status(404).json({ error: 'Student not found' });
     }
 
-    // Determine type: 'ENTRY' or 'EXIT'
     const type = action_type === 'EXIT' ? 'EXIT' : 'ENTRY';
 
-    // Anti-duplicate cooldown: prevent sending multiple messages for the exact same action within 5 minutes
+    // Anti-duplicate cooldown: prevent duplicate alerts for same action within 5 mins
     const cooldownQuery = `
       SELECT timestamp, type FROM attendance_logs 
       WHERE student_id = ? AND type = ?
@@ -260,7 +324,8 @@ app.post('/api/attendance/mark', async (req, res) => {
               name: student.name,
               roll_no: student.roll_no,
               batch: student.batch,
-              parent_phone: student.parent_phone
+              parent_phone: student.parent_phone,
+              secondary_phone: student.secondary_phone
             }
           });
         }
@@ -269,10 +334,10 @@ app.post('/api/attendance/mark', async (req, res) => {
       const now = new Date();
       const timeFormatted = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 
-      // Trigger WhatsApp Alert in the background
-      sendAttendanceAlert(student.name, student.roll_no, student.parent_phone, timeFormatted, type)
+      // Trigger WhatsApp Alert to primary (+ secondary if available) in background
+      sendAttendanceAlert(student.name, student.roll_no, student.parent_phone, timeFormatted, type, student.secondary_phone)
         .then(waResult => {
-          const status = waResult.success ? (waResult.simulated ? 'SIMULATED' : 'SENT') : 'FAILED';
+          const status = waResult.success ? (process.env.SIMULATE_WHATSAPP === 'true' ? 'SIMULATED' : 'SENT') : 'FAILED';
           const responseStr = JSON.stringify(waResult);
 
           db.run(
@@ -297,7 +362,8 @@ app.post('/api/attendance/mark', async (req, res) => {
           name: student.name,
           roll_no: student.roll_no,
           batch: student.batch,
-          parent_phone: student.parent_phone
+          parent_phone: student.parent_phone,
+          secondary_phone: student.secondary_phone
         },
         time: timeFormatted
       });
@@ -305,9 +371,7 @@ app.post('/api/attendance/mark', async (req, res) => {
   });
 });
 
-/**
- * 5. Get recent attendance logs
- */
+// Recent attendance logs
 app.get('/api/attendance/logs', (req, res) => {
   const query = `
     SELECT id, student_name, roll_no, timestamp, parent_phone, whatsapp_status, type 
@@ -316,16 +380,12 @@ app.get('/api/attendance/logs', (req, res) => {
     LIMIT 50
   `;
   db.all(query, [], (err, rows) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
+    if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });
 });
 
-/**
- * 5. Check WhatsApp Service Status
- */
+// Check WhatsApp Service Status
 app.get('/api/whatsapp/status', async (req, res) => {
   const status = await checkSessionStatus();
   res.json({
@@ -338,9 +398,7 @@ app.get('/api/whatsapp/status', async (req, res) => {
   });
 });
 
-/**
- * 6. Get QR Code for WhatsApp linking
- */
+// Get QR Code for WhatsApp linking
 app.get('/api/whatsapp/qr', async (req, res) => {
   try {
     const axios = require('axios');
@@ -362,7 +420,6 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`📱 Access on Mobile via Local Wi-Fi: http://<YOUR_PC_IP>:${PORT}`);
   console.log(`=================================================`);
 
-  // Start UDP Discovery Beacon on Local Wi-Fi
   startUdpDiscoveryBeacon();
 });
 

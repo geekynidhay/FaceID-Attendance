@@ -3,115 +3,111 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>DOT-CMC Attendance Portal & Kiosk</title>
+  <title>Apex Face Attendance | DOT-CMC Computer Center</title>
   
+  <!-- PWA Manifest & Meta -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#030712">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="DOT-CMC">
-  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Face API JS -->
-  <script src="face-api.min.js"></script>
-  <!-- FontAwesome 6 -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- SheetJS (xlsx) for instant Excel Export without external build dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <style>
     body {
-      font-family: 'Plus Jakarta Sans', sans-serif;
       background-color: #030712;
-      -webkit-tap-highlight-color: transparent;
+      color: #f3f4f6;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      touch-action: manipulation;
       user-select: none;
+      -webkit-user-select: none;
     }
-    .font-mono {
-      font-family: 'JetBrains Mono', monospace;
-    }
-    .scan-reticle {
-      position: absolute;
-      inset: 16px;
-      border: 2px dashed rgba(16, 185, 129, 0.4);
-      border-radius: 20px;
-      pointer-events: none;
-    }
-    .corner-bracket {
-      position: absolute;
-      width: 22px;
-      height: 22px;
-      border-color: #10b981;
-      border-style: solid;
-      pointer-events: none;
-    }
-    .corner-tl { top: 10px; left: 10px; border-width: 3px 0 0 3px; border-top-left-radius: 8px; }
-    .corner-tr { top: 10px; right: 10px; border-width: 3px 3px 0 0; border-top-right-radius: 8px; }
-    .corner-bl { bottom: 10px; left: 10px; border-width: 0 0 3px 3px; border-bottom-left-radius: 8px; }
-    .corner-br { bottom: 10px; right: 10px; border-width: 0 3px 3px 0; border-bottom-right-radius: 8px; }
-
-    .cyber-laser {
-      position: absolute;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, #10b981, #34d399, transparent);
-      box-shadow: 0 0 16px 2px #10b981;
-      animation: modernScan 2.4s ease-in-out infinite;
-      display: none;
-    }
-    @keyframes modernScan {
-      0% { top: 10%; opacity: 0.2; }
-      50% { top: 88%; opacity: 1; }
-      100% { top: 10%; opacity: 0.2; }
-    }
-    canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-    }
+    
     .glass-card {
-      background: rgba(17, 24, 39, 0.7);
+      background: rgba(15, 23, 42, 0.75);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
+
     .glass-header {
       background: rgba(3, 7, 18, 0.85);
-      backdrop-filter: blur(18px);
-      -webkit-backdrop-filter: blur(18px);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+    .scanner-laser {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #10b981, #34d399, #10b981, transparent);
+      box-shadow: 0 0 16px 2px #10b981;
+      animation: scan 2.2s ease-in-out infinite alternate;
+    }
+
+    @keyframes scan {
+      0% { top: 4%; }
+      100% { top: 96%; }
+    }
+
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
     }
   </style>
-</head>
-<body class="text-slate-100 min-h-screen flex flex-col justify-between antialiased">
 
-  <!-- ================= TOP HEADER ================= -->
-  <header class="glass-header sticky top-0 z-40 px-4 md:px-8 py-3">
+  <!-- Face-API.js -->
+  <script defer src="face-api.min.js"></script>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-emerald-500 selection:text-white">
+
+  <!-- ================= TOP HEADER BAR ================= -->
+  <header class="glass-header sticky top-0 z-40 border-b border-slate-800/80 px-4 py-3 md:px-8">
     <div class="max-w-7xl mx-auto flex items-center justify-between">
       
-      <!-- Logo & Branding -->
+      <!-- Brand & Status -->
       <div class="flex items-center space-x-3">
-        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white shadow-lg shadow-emerald-500/25">
-          <i class="fa-solid fa-graduation-cap text-base"></i>
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 p-[1.5px] flex items-center justify-center shadow-lg shadow-emerald-500/20">
+          <div class="w-full h-full bg-slate-950 rounded-2xl flex items-center justify-center">
+            <i class="fa-solid fa-graduation-cap text-emerald-400 text-lg"></i>
+          </div>
         </div>
         <div>
-          <h1 class="text-sm md:text-base font-extrabold text-white tracking-tight leading-tight">DOT-CMC Computer Center</h1>
-          <div id="wa-pill" onclick="handleWhatsAppPillClick()" class="cursor-pointer inline-flex items-center space-x-1.5 mt-0.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span id="wa-status-text" class="text-[11px] font-semibold text-emerald-400">WhatsApp Active</span>
+          <div class="flex items-center space-x-2">
+            <h1 class="font-black text-sm md:text-base tracking-tight text-white flex items-center">
+              Apex Smart Kiosk
+            </h1>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              DOT-CMC
+            </span>
+          </div>
+          <div class="flex items-center space-x-2">
+            <!-- WhatsApp Pill -->
+            <div id="wa-pill" onclick="handleWhatsAppPillClick()" class="cursor-pointer inline-flex items-center space-x-1.5 mt-0.5 px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400 hover:border-emerald-500 transition">
+              <i class="fa-brands fa-whatsapp text-xs"></i>
+              <span id="wa-status-text" class="text-[10px] font-semibold">Connecting WhatsApp...</span>
+            </div>
+            <!-- Staff Phone Pill -->
+            <span id="device-identity-badge" class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+              <i class="fa-solid fa-mobile-screen mr-1 text-[9px]"></i> <span id="device-name-display">Staff Device</span>
+            </span>
           </div>
         </div>
       </div>
 
-      <!-- DESKTOP TOP NAV TABS (HIDDEN ON PHONE) -->
-      <nav class="hidden md:flex items-center space-x-2 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800">
+      <!-- Desktop Navigation Tabs -->
+      <div class="hidden md:flex items-center space-x-2 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800">
         <button id="web-nav-scan-btn" onclick="switchTab('scan')" class="px-5 py-2 rounded-xl text-xs font-bold transition bg-emerald-600 text-white shadow-md shadow-emerald-600/30">
           <i class="fa-solid fa-camera mr-2"></i> Scanner
         </button>
@@ -121,125 +117,114 @@
         <button id="web-nav-logs-btn" onclick="switchTab('logs')" class="px-5 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition">
           <i class="fa-solid fa-user-shield mr-2"></i> Admin Mode
         </button>
-      </nav>
+      </div>
 
-      <!-- Action Icons (Camera Flip & Device Name) -->
+      <!-- Quick Action Controls -->
       <div class="flex items-center space-x-2">
-        <button onclick="toggleCameraMirror()" title="Flip Camera" class="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/50 flex items-center justify-center text-slate-300 active:scale-95 transition">
-          <i class="fa-solid fa-camera-rotate text-xs"></i>
+        <button onclick="toggleCameraMirror()" title="Flip Front / Back Camera" class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition">
+          <i class="fa-solid fa-camera-rotate text-sm"></i>
         </button>
-        <button onclick="promptSetDeviceName()" title="Staff Phone Name" class="px-2.5 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/50 flex items-center text-xs font-semibold text-slate-300 active:scale-95 transition">
-          <i class="fa-solid fa-mobile-screen mr-1.5 text-emerald-400"></i>
-          <span id="top-device-name-label">Staff Phone</span>
-        </button>
-        <button onclick="openServerConfigModal()" title="Server Config" class="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/50 flex items-center justify-center text-slate-300 active:scale-95 transition">
-          <i class="fa-solid fa-gear text-xs"></i>
+        <button onclick="openServerConfigModal()" title="Server IP Link" class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition">
+          <i class="fa-solid fa-gear text-sm"></i>
         </button>
       </div>
 
     </div>
   </header>
 
-  <!-- ================= MAIN CONTAINER ================= -->
-  <main class="flex-1 w-full max-w-7xl mx-auto p-3 md:p-8">
+  <!-- ================= MAIN CONTENT CONTAINER ================= -->
+  <main class="flex-1 w-full max-w-7xl mx-auto p-3 md:p-6 flex flex-col justify-start">
+
+    <!-- Model Loading Banner -->
+    <div id="model-loader" class="w-full glass-card rounded-2xl p-4 mb-4 border border-emerald-500/30 flex items-center justify-between text-xs text-emerald-300 animate-pulse">
+      <div class="flex items-center space-x-3">
+        <i class="fa-solid fa-brain text-emerald-400 text-base"></i>
+        <span id="loader-status">Initializing face recognition neural weights...</span>
+      </div>
+      <div class="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
+    </div>
 
     <!-- 1. SCANNER VIEW -->
-    <section id="tab-scan" class="w-full">
-      <div class="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 items-start">
+    <section id="tab-scan" class="w-full flex flex-col items-center space-y-4">
+
+      <!-- TOP: ATTENDANCE DISPATCH & STATUS CARD -->
+      <div class="w-full max-w-lg">
         
-        <!-- Left: Live Camera View + ONLY Scan & Auto buttons at bottom -->
-        <div class="md:col-span-7 space-y-3">
-          
-          <!-- TOP: RECOGNITION / EXIT DISPATCH CARD (NOW ON TOP) -->
-          <div class="glass-card rounded-2xl p-3.5 border border-slate-800 shadow-xl min-h-[72px] flex items-center justify-between">
-            <div id="checkin-blank" class="flex items-center space-x-3 py-1">
-              <div class="w-9 h-9 rounded-xl bg-slate-800/70 border border-slate-700/50 flex items-center justify-center text-slate-400 text-base">
-                <i class="fa-solid fa-fingerprint"></i>
-              </div>
-              <div>
-                <h4 class="text-xs font-bold text-white">Scanner Standby</h4>
-                <p class="text-[11px] text-slate-400">Look at camera & tap Scan Face • Auto Exit confirmation</p>
-              </div>
-            </div>
+        <!-- Result Card (Shown when attendance is marked) -->
+        <div id="checkin-result" class="hidden glass-card rounded-3xl p-4 md:p-5 border border-emerald-500/40 shadow-2xl relative overflow-hidden animate-fade-in">
+          <div class="flex items-center justify-between mb-2">
+            <span id="res-wa-badge" class="px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-wide uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+              DISPATCHED
+            </span>
+            <span id="res-checkin-time" class="text-xs font-mono text-slate-400">10:45 AM</span>
+          </div>
 
-            <div id="checkin-result" class="hidden w-full flex items-center justify-between animate-fade-in">
-              <div class="flex items-center space-x-3">
-                <div class="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-base">
-                  <i class="fa-solid fa-circle-check"></i>
-                </div>
-                <div>
-                  <h3 id="res-student-name" class="text-xs md:text-sm font-extrabold text-white">Student Name</h3>
-                  <p id="res-roll-batch" class="text-[10px] md:text-xs font-semibold text-emerald-400">Class 12 • ENTERED</p>
-                </div>
-              </div>
-              <div class="text-right flex flex-col items-end">
-                <span id="res-wa-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                  DISPATCHED
-                </span>
-                <span id="res-checkin-time" class="font-mono text-slate-400 text-[10px] mt-1">10:45 AM</span>
-              </div>
+          <div class="flex items-center space-x-3">
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center text-white text-lg font-black shadow-lg shadow-emerald-500/30">
+              <i class="fa-solid fa-check"></i>
+            </div>
+            <div>
+              <h3 id="res-student-name" class="text-base md:text-lg font-extrabold text-white leading-tight">Student Name</h3>
+              <p id="res-roll-batch" class="text-xs text-slate-300 font-mono mt-0.5">DOT-101 • Basic Computer</p>
             </div>
           </div>
 
-          <!-- Live Camera Viewport -->
-          <div class="relative w-full aspect-[4/3] rounded-3xl overflow-hidden glass-card border border-slate-800 shadow-2xl flex items-center justify-center">
-            <video id="video-stream" autoplay muted playsinline class="w-full h-full object-cover"></video>
-            <canvas id="overlay-canvas"></canvas>
-            
-            <div class="corner-bracket corner-tl"></div>
-            <div class="corner-bracket corner-tr"></div>
-            <div class="corner-bracket corner-bl"></div>
-            <div class="corner-bracket corner-br"></div>
-            <div class="scan-reticle"></div>
-            <div id="scanner-laser" class="cyber-laser"></div>
-
-            <div id="model-loader" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center z-30 p-6 text-center">
-              <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-2.5">
-                <i class="fa-solid fa-circle-notch fa-spin text-xl"></i>
-              </div>
-              <p id="loader-status" class="text-xs md:text-sm font-bold text-white">Loading Neural Vision Engine...</p>
-            </div>
-
-            <div class="absolute bottom-3 inset-x-3 z-20 flex justify-center">
-              <div class="px-3.5 py-1.5 rounded-full bg-slate-950/85 backdrop-blur-md border border-slate-700/60 shadow-lg flex items-center space-x-2">
-                <span id="detected-counter" class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                <span id="scanner-status-text" class="text-xs font-semibold text-slate-200">Look at camera & tap Scan</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- ONLY Scan Face & Auto Scan at the Bottom -->
-          <div class="grid grid-cols-4 gap-2 pt-1">
-            <button id="btn-manual-scan" onclick="triggerManualScan()" class="col-span-3 py-3.5 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 active:from-emerald-600 active:to-teal-600 rounded-2xl font-bold text-white shadow-lg shadow-emerald-500/25 flex items-center justify-center space-x-2 text-xs md:text-sm transition active:scale-[0.98]">
-              <i class="fa-solid fa-expand text-base"></i>
-              <span>SCAN FACE (PRESS ENTER)</span>
-            </button>
-
-            <button onclick="toggleContinuousScan()" id="btn-toggle-continuous" class="col-span-1 py-3 px-2 glass-card hover:bg-slate-800/80 rounded-2xl border border-slate-800 flex flex-col items-center justify-center active:scale-95 transition">
-              <i class="fa-solid fa-bolt text-xs text-slate-400 mb-0.5"></i>
-              <span class="text-[9px] font-bold text-slate-400">AUTO</span>
-              <span id="auto-scan-status" class="text-[9px] font-extrabold text-rose-400">OFF</span>
-            </button>
-          </div>
-
-        </div>
-
-        <!-- Right: Recent Feed (Hidden on phone view to keep phone clean, Visible on Desktop) -->
-        <div class="hidden md:block md:col-span-5 space-y-4">
-          <div class="glass-card rounded-3xl p-5 border border-slate-800 shadow-xl space-y-3">
-            <div class="flex items-center justify-between pb-2 border-b border-slate-800">
-              <h3 class="text-xs font-bold text-white uppercase tracking-wider">Live Check-in Stream</h3>
-              <span class="text-[10px] text-emerald-400 flex items-center">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block mr-1 animate-pulse"></span> Real-time
-              </span>
-            </div>
-            <div class="max-h-[360px] overflow-y-auto space-y-2 pr-1" id="side-recent-logs">
-              <div class="text-center py-6 text-xs text-slate-500">No logs yet</div>
-            </div>
+          <div class="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+            <span class="flex items-center space-x-1.5">
+              <i class="fa-brands fa-whatsapp text-emerald-400 text-sm"></i>
+              <span id="res-parent-phone" class="font-mono text-white text-[11px]">+91 9893177887</span>
+            </span>
+            <span class="text-[10px] text-emerald-400 font-semibold flex items-center">
+              <i class="fa-solid fa-circle-check mr-1"></i> Notification Sent
+            </span>
           </div>
         </div>
 
+        <!-- Standby Prompt (Top default) -->
+        <div id="checkin-blank" class="glass-card rounded-3xl p-3 border border-slate-800/80 text-center flex items-center justify-between px-4">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
+            <span id="scanner-status-text" class="text-xs font-medium text-slate-300">
+              Face scanner active • Stand in front of camera
+            </span>
+          </div>
+          <span class="text-[10px] text-slate-500 font-mono hidden sm:inline">Instant AI Recognition</span>
+        </div>
       </div>
+
+      <!-- CAMERA STREAM VIEWFINDER -->
+      <div class="relative w-full max-w-lg aspect-[4/3] rounded-3xl overflow-hidden glass-card border border-slate-800 shadow-2xl bg-slate-950 flex items-center justify-center">
+        
+        <!-- Video Element -->
+        <video id="video-stream" autoplay muted playsinline class="w-full h-full object-cover"></video>
+        
+        <!-- Overlay Canvas for Bounding Boxes -->
+        <canvas id="overlay-canvas" class="absolute inset-0 pointer-events-none w-full h-full"></canvas>
+
+        <!-- Dynamic Laser Animation -->
+        <div id="scanner-laser" class="scanner-laser"></div>
+
+        <!-- Reticle Face Guide (Dotted Oval) -->
+        <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
+          <div class="w-48 h-64 border-2 border-dashed border-emerald-400/50 rounded-full transition-all duration-300 flex items-center justify-center">
+            <div class="w-2 h-2 rounded-full bg-emerald-400/70" id="detected-counter"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOTTOM SCANNER CONTROLS (ONLY SCAN FACE AND AUTO) -->
+      <div class="w-full max-w-lg grid grid-cols-2 gap-3 pt-1">
+        <button id="btn-manual-scan" onclick="triggerManualScan()" class="py-3.5 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 text-white font-extrabold rounded-2xl text-xs md:text-sm shadow-xl shadow-emerald-500/25 active:scale-95 transition flex items-center justify-center space-x-2">
+          <i class="fa-solid fa-expand text-base"></i>
+          <span>Scan Face (Enter)</span>
+        </button>
+
+        <button id="btn-toggle-continuous" onclick="toggleContinuousScan()" class="py-3.5 px-4 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 font-bold rounded-2xl text-xs md:text-sm active:scale-95 transition flex items-center justify-center space-x-2">
+          <i class="fa-solid fa-bolt text-amber-400"></i>
+          <span>Auto: <span id="auto-scan-status" class="text-rose-400 font-bold">OFF</span></span>
+        </button>
+      </div>
+
     </section>
 
     <!-- 2. REGISTRATION VIEW -->
@@ -250,7 +235,7 @@
             <h2 class="text-lg md:text-xl font-extrabold text-white flex items-center">
               <i class="fa-solid fa-user-plus text-emerald-400 mr-2.5 text-base"></i> Student Registration
             </h2>
-            <p class="text-xs text-slate-400 mt-0.5">Captures face & sends bilingual welcome message with helpline</p>
+            <p class="text-xs text-slate-400 mt-0.5">Captures face & sends bilingual welcome message to parents</p>
           </div>
           <button type="button" onclick="generateAutoRollNumber()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-semibold text-emerald-400 flex items-center transition">
             <i class="fa-solid fa-arrows-rotate mr-1.5"></i> Reroll ID
@@ -262,12 +247,14 @@
           <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
             <!-- Inputs -->
             <div class="space-y-4">
+              <!-- Student Name -->
               <div>
                 <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Student Full Name *</label>
-                <input type="text" id="reg-name" required placeholder="e.g. Rahul Sharma" 
+                <input type="text" id="reg-name" required 
                        class="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-4 py-3 text-xs md:text-sm text-white focus:outline-none focus:border-emerald-500">
               </div>
 
+              <!-- Roll No & Batch Dropdown -->
               <div class="grid grid-cols-2 gap-3">
                 <div>
                   <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Roll / ID (Auto)</label>
@@ -276,22 +263,60 @@
                 </div>
                 <div>
                   <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Batch / Class</label>
-                  <input type="text" id="reg-batch" placeholder="e.g. Java Morning" 
+                  <select id="reg-batch" class="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-4 py-3 text-xs md:text-sm text-white focus:outline-none focus:border-emerald-500">
+                    <option value="Basic Computer">Basic Computer</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Father's & Mother's Name (Optional) -->
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Father's Name <span class="text-slate-500 font-normal lowercase">(optional)</span></label>
+                  <input type="text" id="reg-father" 
+                         class="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-4 py-3 text-xs md:text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Mother's Name <span class="text-slate-500 font-normal lowercase">(optional)</span></label>
+                  <input type="text" id="reg-mother" 
                          class="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-4 py-3 text-xs md:text-sm text-white focus:outline-none focus:border-emerald-500">
                 </div>
               </div>
 
+              <!-- Primary WhatsApp Phone -->
               <div>
-                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Parent WhatsApp Number *</label>
+                <div class="flex items-center justify-between mb-1">
+                  <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">Parent WhatsApp Number *</label>
+                  <button type="button" id="btn-toggle-secondary-phone" onclick="toggleSecondaryPhoneField()" class="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition flex items-center">
+                    <i class="fa-solid fa-plus-circle mr-1"></i> Add 2nd Number
+                  </button>
+                </div>
                 <div class="relative flex items-center">
                   <span class="inline-flex items-center px-4 py-3 rounded-l-xl border border-r-0 border-slate-700/80 bg-slate-900 text-emerald-400 font-bold text-xs md:text-sm">
                     <i class="fa-brands fa-whatsapp mr-1.5 text-base"></i> +91
                   </span>
-                  <input type="tel" id="reg-parent-phone" required maxlength="10" placeholder="10-digit number (e.g. 9893177887)" 
+                  <input type="tel" id="reg-parent-phone" required maxlength="10" 
                          class="w-full bg-slate-950 border border-slate-700/80 rounded-r-xl px-4 py-3 text-xs md:text-sm text-white font-mono focus:outline-none focus:border-emerald-500">
                 </div>
-                <p class="text-[11px] text-slate-500 mt-1">Parents receive welcome message with helpline numbers.</p>
               </div>
+
+              <!-- Secondary WhatsApp Phone (Optional) -->
+              <div id="secondary-phone-container" class="hidden space-y-1">
+                <div class="flex items-center justify-between">
+                  <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">Secondary WhatsApp Number <span class="text-slate-500 font-normal lowercase">(both get notified)</span></label>
+                  <button type="button" onclick="toggleSecondaryPhoneField()" class="text-xs text-rose-400 hover:text-rose-300">
+                    <i class="fa-solid fa-xmark mr-0.5"></i> Remove
+                  </button>
+                </div>
+                <div class="relative flex items-center">
+                  <span class="inline-flex items-center px-4 py-3 rounded-l-xl border border-r-0 border-slate-700/80 bg-slate-900 text-teal-400 font-bold text-xs md:text-sm">
+                    <i class="fa-brands fa-whatsapp mr-1.5 text-base"></i> +91
+                  </span>
+                  <input type="tel" id="reg-secondary-phone" maxlength="10" 
+                         class="w-full bg-slate-950 border border-slate-700/80 rounded-r-xl px-4 py-3 text-xs md:text-sm text-white font-mono focus:outline-none focus:border-emerald-500">
+                </div>
+              </div>
+
             </div>
 
             <!-- Face Capture: Option A (Local Camera) vs Option B (Remote Phone Click) -->
@@ -359,40 +384,83 @@
       </div>
     </section>
 
-    <!-- 3. ADMIN MODE (STUDENTS MANAGEMENT + ATTENDANCE AUDIT) -->
+    <!-- 3. ADMIN MODE (STUDENTS MANAGEMENT + BATCHES + EXPORT TO EXCEL) -->
     <section id="tab-logs" class="hidden w-full max-w-5xl mx-auto space-y-5">
       
-      <!-- Admin Top Card: Summary & Tabs -->
+      <!-- Admin Top Card: Summary & Sub-Tabs & Export -->
       <div class="glass-card rounded-3xl p-5 md:p-6 border border-slate-800 shadow-2xl space-y-4">
         <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
           <div>
             <h2 class="text-base md:text-lg font-extrabold text-white flex items-center">
-              <i class="fa-solid fa-user-shield text-emerald-400 mr-2.5"></i> Admin Mode
+              <i class="fa-solid fa-user-shield text-emerald-400 mr-2.5"></i> Admin Control Panel
             </h2>
-            <p class="text-xs text-slate-400 mt-0.5">Manage registered students, delete records & view attendance audit</p>
+            <p class="text-xs text-slate-400 mt-0.5">Manage & edit students, manage batches, audit attendance, or export to Excel</p>
           </div>
 
-          <!-- Sub-mode switch -->
-          <div class="flex items-center space-x-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-bold">
-            <button onclick="switchAdminSubTab('students')" id="admin-sub-students" class="px-3.5 py-1.5 rounded-lg bg-emerald-600 text-white">
-              <i class="fa-solid fa-users mr-1.5"></i> Registered Students (<span id="admin-students-count">0</span>)
-            </button>
-            <button onclick="switchAdminSubTab('logs')" id="admin-sub-logs" class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white">
-              <i class="fa-solid fa-list-check mr-1.5"></i> Attendance Logs
+          <!-- Quick Action: Export to Excel Button -->
+          <div class="flex items-center space-x-2">
+            <button onclick="exportStudentsToExcel()" class="px-3.5 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 text-xs font-bold transition flex items-center space-x-1.5 shadow">
+              <i class="fa-solid fa-file-excel text-emerald-400"></i>
+              <span>Export to Excel</span>
             </button>
           </div>
         </div>
 
-        <!-- Registered Students Table -->
+        <!-- Sub-mode switch tabs -->
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center space-x-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-bold">
+            <button onclick="switchAdminSubTab('students')" id="admin-sub-students" class="px-3.5 py-1.5 rounded-lg bg-emerald-600 text-white transition">
+              <i class="fa-solid fa-users mr-1.5"></i> Students (<span id="admin-students-count">0</span>)
+            </button>
+            <button onclick="switchAdminSubTab('batches')" id="admin-sub-batches" class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white transition">
+              <i class="fa-solid fa-layer-group mr-1.5"></i> Batches
+            </button>
+            <button onclick="switchAdminSubTab('logs')" id="admin-sub-logs" class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white transition">
+              <i class="fa-solid fa-list-check mr-1.5"></i> Logs
+            </button>
+          </div>
+
+          <div id="admin-search-container" class="relative">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-500"></i>
+            <input type="text" id="admin-student-search" oninput="filterAdminStudents()" 
+                   placeholder="Search student or roll..." 
+                   class="bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 w-48 sm:w-64">
+          </div>
+        </div>
+
+        <!-- Registered Students Table / List with Edit Support -->
         <div id="admin-view-students" class="space-y-3">
-          <div class="max-h-[450px] overflow-y-auto space-y-2 pr-1" id="admin-students-list">
+          <div class="max-h-[500px] overflow-y-auto space-y-2 pr-1" id="admin-students-list">
             <div class="text-center py-8 text-xs text-slate-500">Loading student directory...</div>
+          </div>
+        </div>
+
+        <!-- Batches Management View -->
+        <div id="admin-view-batches" class="hidden space-y-4">
+          <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
+            <h3 class="text-xs font-bold text-white uppercase tracking-wider">Add New Batch / Course</h3>
+            <div class="flex items-center space-x-2">
+              <input type="text" id="new-batch-name" 
+                     placeholder="Batch name (e.g. DCA / PGDCA / Java)" 
+                     class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+              <button onclick="addNewBatch()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5">
+                <i class="fa-solid fa-plus"></i>
+                <span>Add Batch</span>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-xs font-bold text-slate-400 mb-2">Existing Batches</h4>
+            <div id="batches-list-container" class="space-y-2">
+              <div class="text-xs text-slate-500 py-3">Loading batches...</div>
+            </div>
           </div>
         </div>
 
         <!-- Attendance Logs Table -->
         <div id="admin-view-logs" class="hidden space-y-3">
-          <div class="max-h-[450px] overflow-y-auto space-y-2 pr-1" id="logs-list-container">
+          <div class="max-h-[500px] overflow-y-auto space-y-2 pr-1" id="logs-list-container">
             <div class="text-center py-8 text-xs text-slate-500">Loading attendance logs...</div>
           </div>
         </div>
@@ -424,7 +492,78 @@
 
   <!-- ================= MODALS ================= -->
 
-  <!-- 1. Remote Camera Capture Triggered on Staff Phone Modal -->
+  <!-- 1. Edit Student Modal -->
+  <div id="edit-student-modal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
+    <div class="glass-card border border-slate-700/80 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-sm md:text-base font-extrabold text-white flex items-center">
+          <i class="fa-solid fa-user-pen text-emerald-400 mr-2"></i> Edit Student Details
+        </h3>
+        <button onclick="closeEditStudentModal()" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+      </div>
+
+      <form id="edit-student-form" onsubmit="saveStudentEdits(event)" class="space-y-3.5">
+        <input type="hidden" id="edit-student-id">
+
+        <div>
+          <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">Student Full Name *</label>
+          <input type="text" id="edit-student-name" required 
+                 class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">Roll / ID</label>
+            <input type="text" id="edit-student-roll" readonly 
+                   class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-emerald-400 font-mono font-bold cursor-not-allowed">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">Batch / Class</label>
+            <select id="edit-student-batch" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">Father's Name</label>
+            <input type="text" id="edit-student-father" 
+                   class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">Mother's Name</label>
+            <input type="text" id="edit-student-mother" 
+                   class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">Parent WhatsApp Number *</label>
+          <input type="tel" id="edit-student-phone" required maxlength="10" 
+                 class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500">
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">Secondary WhatsApp Number (Optional)</label>
+          <input type="tel" id="edit-student-sec-phone" maxlength="10" 
+                 class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800">
+          <button type="submit" id="btn-save-edit" class="py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition">
+            Save Changes
+          </button>
+          <button type="button" onclick="closeEditStudentModal()" class="py-2.5 bg-slate-800 text-slate-300 font-medium rounded-xl text-xs hover:bg-slate-700 transition">
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. Remote Camera Capture Triggered on Staff Phone Modal -->
   <div id="incoming-snap-modal" class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
     <div class="glass-card border border-indigo-500/50 rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl text-center">
       <div class="w-12 h-12 mx-auto rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xl">
@@ -451,7 +590,7 @@
     </div>
   </div>
 
-  <!-- 2. Student Leaving Confirmation Modal -->
+  <!-- 3. Student Leaving Confirmation Modal -->
   <div id="leave-confirm-modal" class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
     <div class="glass-card border border-amber-500/40 rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
       <div class="w-14 h-14 mx-auto rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-2xl">
@@ -476,7 +615,7 @@
     </div>
   </div>
 
-  <!-- 3. WhatsApp QR Code Modal -->
+  <!-- 4. WhatsApp QR Code Modal -->
   <div id="qr-modal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
     <div class="glass-card border border-slate-700/80 rounded-3xl max-w-xs w-full p-6 text-center space-y-4 shadow-2xl">
       <div class="flex justify-between items-center">
@@ -495,7 +634,7 @@
     </div>
   </div>
 
-  <!-- 4. Server Config Modal -->
+  <!-- 5. Server Config Modal -->
   <div id="server-config-modal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
     <div class="glass-card border border-slate-700/80 rounded-3xl max-w-xs w-full p-5 space-y-3.5 shadow-2xl">
       <div class="flex justify-between items-center">
@@ -507,7 +646,7 @@
         </button>
       </div>
       <p class="text-[11px] text-slate-400">Target server host address:</p>
-      <input type="text" id="config-backend-url" placeholder="http://localhost:4000" 
+      <input type="text" id="config-backend-url" 
              class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500">
       <div class="flex space-x-2 pt-1">
         <button onclick="saveServerConfig()" class="flex-1 py-2.5 bg-emerald-600 rounded-xl text-xs font-bold text-white">Save</button>
