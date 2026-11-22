@@ -50,6 +50,14 @@ function initDeviceIdentity() {
     remoteToggleGroup.classList.add('hidden');
   }
 
+  // Hide WhatsApp buttons on phone apps (only Institute Web PC needs WhatsApp login/status)
+  if (isMobile) {
+    const waPill = document.getElementById('wa-pill');
+    const waActionBtn = document.getElementById('web-wa-action-btn');
+    if (waPill) waPill.classList.add('hidden');
+    if (waActionBtn) waActionBtn.classList.add('hidden');
+  }
+
   // Start phone heartbeat
   sendDeviceHeartbeat();
   setInterval(sendDeviceHeartbeat, 15000);
@@ -124,14 +132,10 @@ function getApiBaseUrl() {
 
 // DOM Elements
 const videoStream = document.getElementById('video-stream');
-const overlayCanvas = document.getElementById('overlay-canvas');
 const regVideo = document.getElementById('reg-video');
 const modelLoader = document.getElementById('model-loader');
 const loaderStatus = document.getElementById('loader-status');
 const scannerStatusText = document.getElementById('scanner-status-text');
-const checkinBlank = document.getElementById('checkin-blank');
-const checkinResult = document.getElementById('checkin-result');
-const scannerLaser = document.getElementById('scanner-laser');
 
 // Initialize on page load
 window.addEventListener('DOMContentLoaded', async () => {
@@ -158,8 +162,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   await reloadRegisteredFaces();
   await checkWhatsAppStatus();
   startScannerCamera();
-
-  if (scannerLaser) scannerLaser.style.display = 'none';
 
   // Listen for Enter key
   window.addEventListener('keydown', (e) => {
@@ -393,7 +395,7 @@ async function toggleCameraMirror() {
   await startScannerCamera();
 }
 
-// 4. Manual Scan on ENTER Key or Button (Clean View: No Ugly Bounding Boxes)
+// 4. Manual Scan on ENTER Key or Button (Clean View: No Laser, No Boxes)
 async function triggerManualScan() {
   if (!isModelLoaded) {
     alert("AI Models are still loading. Please wait a second.");
@@ -406,13 +408,8 @@ async function triggerManualScan() {
   if (isProcessingAttendance) return;
 
   const btn = document.getElementById('btn-manual-scan');
-  
-  if (scannerLaser) scannerLaser.style.display = 'block';
   scannerStatusText.innerText = "Analyzing face...";
   if (btn) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Scanning...`;
-
-  const ctx = overlayCanvas.getContext('2d');
-  ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
   try {
     const detections = await faceapi.detectAllFaces(
@@ -423,7 +420,7 @@ async function triggerManualScan() {
     .withFaceDescriptors();
 
     if (detections.length === 0) {
-      scannerStatusText.innerText = "No face detected! Look directly into the camera and press Enter.";
+      scannerStatusText.innerText = "No face detected! Look directly into the camera.";
     } else {
       if (!faceMatcher) {
         scannerStatusText.innerText = "No students registered yet! Go to the Register tab first.";
@@ -453,7 +450,6 @@ async function triggerManualScan() {
     scannerStatusText.innerText = "Scan error: " + err.message;
   } finally {
     setTimeout(() => {
-      if (scannerLaser && !isContinuousScanning) scannerLaser.style.display = 'none';
       if (btn) btn.innerHTML = `<i class="fa-solid fa-expand text-base"></i><span>Scan Face (Enter)</span>`;
     }, 1200);
   }
@@ -467,12 +463,10 @@ function toggleContinuousScan() {
   if (isContinuousScanning) {
     statusEl.innerText = "ON";
     statusEl.className = "text-emerald-400 font-bold";
-    if (scannerLaser) scannerLaser.style.display = 'block';
     startContinuousLoop();
   } else {
     statusEl.innerText = "OFF";
     statusEl.className = "text-rose-400 font-bold";
-    if (scannerLaser) scannerLaser.style.display = 'none';
     if (detectionInterval) clearInterval(detectionInterval);
   }
 }
@@ -550,7 +544,10 @@ async function executeAttendanceMark(studentId, actionType) {
 
     const data = await res.json();
     if (data.success) {
-      showCheckinSuccess(data);
+      scannerStatusText.innerText = data.type === 'EXIT' 
+        ? `Departure recorded for ${data.student.name}!` 
+        : `Arrival recorded for ${data.student.name}!`;
+      playSuccessSound();
     }
   } catch (err) {
     console.error("Error submitting attendance:", err);
@@ -559,36 +556,6 @@ async function executeAttendanceMark(studentId, actionType) {
       isProcessingAttendance = false;
     }, 3500);
   }
-}
-
-function showCheckinSuccess(data) {
-  checkinBlank.classList.add('hidden');
-  checkinResult.classList.remove('hidden');
-
-  const isExit = data.type === 'EXIT';
-
-  document.getElementById('res-student-name').innerText = data.student.name;
-  document.getElementById('res-roll-batch').innerText = `${data.student.batch || 'Basic Computer'} • ${isExit ? 'LEFT INSTITUTE' : 'ENTERED INSTITUTE'}`;
-  document.getElementById('res-checkin-time').innerText = `${data.time || new Date().toLocaleTimeString()}`;
-  
-  const phoneText = data.student.secondary_phone 
-    ? `${data.student.parent_phone}, ${data.student.secondary_phone}`
-    : data.student.parent_phone;
-  document.getElementById('res-parent-phone').innerText = phoneText;
-
-  const waBadge = document.getElementById('res-wa-badge');
-
-  if (data.cooldown) {
-    waBadge.innerText = "ALREADY RECORDED";
-    waBadge.className = "px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-wide uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30";
-  } else {
-    waBadge.innerText = isExit ? "EXIT NOTIFIED" : "ARRIVAL NOTIFIED";
-    waBadge.className = isExit 
-      ? "px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-wide uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30"
-      : "px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-wide uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
-  }
-
-  playSuccessSound();
 }
 
 function playSuccessSound() {
@@ -765,7 +732,10 @@ function startListeningForRemoteSnapRequests() {
 
 async function showRemoteSnapModal(task) {
   currentIncomingSnapTask = task;
-  document.getElementById('snap-target-name').innerText = task.student_name;
+  const nameEl = document.getElementById('snap-target-name');
+  if (nameEl) {
+    nameEl.innerText = (task && task.student_name) ? task.student_name : 'Student';
+  }
   document.getElementById('incoming-snap-modal').classList.remove('hidden');
 
   try {
@@ -782,7 +752,16 @@ async function showRemoteSnapModal(task) {
 }
 
 async function submitRemoteSnap() {
-  if (!currentIncomingSnapTask) return;
+  if (!currentIncomingSnapTask) {
+    alert("No active photo request found.");
+    dismissRemoteSnap();
+    return;
+  }
+
+  // Fallback student name string to prevent null error
+  const targetStudentName = (currentIncomingSnapTask && currentIncomingSnapTask.student_name) 
+    ? currentIncomingSnapTask.student_name 
+    : 'Student';
 
   const btn = document.getElementById('btn-snap-submit');
   btn.disabled = true;
@@ -816,7 +795,7 @@ async function submitRemoteSnap() {
     });
 
     dismissRemoteSnap();
-    alert(`Photo for "${currentIncomingSnapTask.student_name}" sent to PC successfully!`);
+    alert(`Photo for "${targetStudentName}" sent to PC successfully!`);
 
   } catch (err) {
     alert("Failed to submit photo: " + err.message);
@@ -1299,10 +1278,13 @@ async function loadAttendanceLogs() {
   }
 }
 
-// 9. WhatsApp Status & QR Code
+// 9. WhatsApp Status & QR Code (Web PC only)
 let qrPollingInterval = null;
 
 async function checkWhatsAppStatus() {
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  if (isMobile) return; // Not needed on staff phone
+
   const textEl = document.getElementById('wa-status-text');
   const pill = document.getElementById('wa-pill');
 
@@ -1314,18 +1296,18 @@ async function checkWhatsAppStatus() {
       if (textEl) textEl.innerText = "Simulated";
       if (pill) pill.className = "cursor-pointer inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400";
     } else if (data.service && (data.service.status === 'authenticated' || data.service.status === 'ready' || data.service.status === 'CONNECTED')) {
-      if (textEl) textEl.innerText = (data.service.pushName || 'Active');
+      if (textEl) textEl.innerText = (data.service.pushName || 'WhatsApp Active');
       if (pill) pill.className = "cursor-pointer inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400";
       closeQRCodeModal();
     } else if (data.service && data.service.status === 'qr_ready') {
-      if (textEl) textEl.innerText = "Scan QR";
+      if (textEl) textEl.innerText = "Link WhatsApp";
       if (pill) pill.className = "cursor-pointer inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 animate-pulse";
     } else {
-      if (textEl) textEl.innerText = "Offline";
+      if (textEl) textEl.innerText = "Link WhatsApp";
       if (pill) pill.className = "cursor-pointer inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400";
     }
   } catch (err) {
-    if (textEl) textEl.innerText = "Offline";
+    if (textEl) textEl.innerText = "Link WhatsApp";
     if (pill) pill.className = "cursor-pointer inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400";
   }
 }

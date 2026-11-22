@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Apex Face Attendance | DOT-CMC Computer Center</title>
+  <title>DOT-CMC</title>
   
   <!-- PWA Manifest & Meta -->
   <link rel="manifest" href="manifest.json">
@@ -42,22 +42,6 @@
       -webkit-backdrop-filter: blur(20px);
     }
 
-    .scanner-laser {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 3px;
-      background: linear-gradient(90deg, transparent, #10b981, #34d399, #10b981, transparent);
-      box-shadow: 0 0 16px 2px #10b981;
-      animation: scan 2.2s ease-in-out infinite alternate;
-    }
-
-    @keyframes scan {
-      0% { top: 4%; }
-      100% { top: 96%; }
-    }
-
     .no-scrollbar::-webkit-scrollbar {
       display: none;
     }
@@ -76,7 +60,7 @@
   <header class="glass-header sticky top-0 z-40 border-b border-slate-800/80 px-4 py-3 md:px-8">
     <div class="max-w-7xl mx-auto flex items-center justify-between">
       
-      <!-- Brand & Status -->
+      <!-- Brand & Staff Identifier -->
       <div class="flex items-center space-x-3">
         <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 p-[1.5px] flex items-center justify-center shadow-lg shadow-emerald-500/20">
           <div class="w-full h-full bg-slate-950 rounded-2xl flex items-center justify-center">
@@ -84,22 +68,20 @@
           </div>
         </div>
         <div>
-          <div class="flex items-center space-x-2">
-            <h1 class="font-black text-sm md:text-base tracking-tight text-white flex items-center">
-              DOT-CMC Computer Center
-            </h1>
-          </div>
+          <h1 class="font-black text-base md:text-lg tracking-tight text-white flex items-center">
+            DOT-CMC
+          </h1>
           <div class="flex items-center space-x-2 mt-0.5">
             <!-- Staff Name Pill (Click to rename) -->
             <button onclick="promptChangeStaffName()" title="Click to rename staff" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 hover:border-indigo-400 transition">
               <i class="fa-solid fa-user-tag mr-1 text-[9px] text-indigo-400"></i>
               <span id="device-name-display">Staff</span>
             </button>
-            <!-- WhatsApp Pill -->
-            <div id="wa-pill" onclick="handleWhatsAppPillClick()" class="cursor-pointer inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-slate-800/90 border border-slate-700 text-slate-400 hover:border-emerald-500 transition">
-              <i class="fa-brands fa-whatsapp text-[10px]"></i>
-              <span id="wa-status-text" class="text-[9px] font-semibold">WhatsApp</span>
-            </div>
+            <!-- WhatsApp Status Pill (Web only - hidden on staff phone app) -->
+            <button id="wa-pill" onclick="handleWhatsAppPillClick()" class="hidden md:inline-flex cursor-pointer items-center space-x-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:border-emerald-400 transition text-[10px] font-bold">
+              <i class="fa-brands fa-whatsapp text-xs"></i>
+              <span id="wa-status-text">WhatsApp Login</span>
+            </button>
           </div>
         </div>
       </div>
@@ -119,10 +101,15 @@
 
       <!-- Quick Action Controls -->
       <div class="flex items-center space-x-2">
+        <!-- WhatsApp Connect Button (Visible on Web PC only) -->
+        <button id="web-wa-action-btn" onclick="showQRCodeModal()" title="Link WhatsApp" class="hidden md:flex items-center space-x-1.5 py-2 px-3 rounded-xl bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-600 hover:text-white transition text-xs font-bold shadow">
+          <i class="fa-brands fa-whatsapp text-sm text-emerald-400"></i>
+          <span>WhatsApp QR</span>
+        </button>
         <button onclick="toggleCameraMirror()" title="Flip Front / Back Camera" class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition">
           <i class="fa-solid fa-camera-rotate text-sm"></i>
         </button>
-        <button onclick="openServerConfigModal()" title="Server IP Link" class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition">
+        <button onclick="openServerConfigModal()" title="Server Link" class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition">
           <i class="fa-solid fa-gear text-sm"></i>
         </button>
       </div>
@@ -145,62 +132,19 @@
     <!-- 1. SCANNER VIEW -->
     <section id="tab-scan" class="w-full flex flex-col items-center space-y-4">
 
-      <!-- TOP: ATTENDANCE DISPATCH & STATUS CARD -->
-      <div class="w-full max-w-lg">
-        
-        <!-- Result Card (Shown when attendance is marked) -->
-        <div id="checkin-result" class="hidden glass-card rounded-3xl p-4 md:p-5 border border-emerald-500/40 shadow-2xl relative overflow-hidden animate-fade-in">
-          <div class="flex items-center justify-between mb-2">
-            <span id="res-wa-badge" class="px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-wide uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-              DISPATCHED
-            </span>
-            <span id="res-checkin-time" class="text-xs font-mono text-slate-400">10:45 AM</span>
-          </div>
-
-          <div class="flex items-center space-x-3">
-            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center text-white text-lg font-black shadow-lg shadow-emerald-500/30">
-              <i class="fa-solid fa-check"></i>
-            </div>
-            <div>
-              <h3 id="res-student-name" class="text-base md:text-lg font-extrabold text-white leading-tight">Student Name</h3>
-              <p id="res-roll-batch" class="text-xs text-slate-300 font-mono mt-0.5">DOT-101 • Basic Computer</p>
-            </div>
-          </div>
-
-          <div class="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
-            <span class="flex items-center space-x-1.5">
-              <i class="fa-brands fa-whatsapp text-emerald-400 text-sm"></i>
-              <span id="res-parent-phone" class="font-mono text-white text-[11px]">+91 9893177887</span>
-            </span>
-            <span class="text-[10px] text-emerald-400 font-semibold flex items-center">
-              <i class="fa-solid fa-circle-check mr-1"></i> Notification Sent
-            </span>
-          </div>
-        </div>
-
-        <!-- Standby Prompt (Top default) -->
-        <div id="checkin-blank" class="glass-card rounded-3xl p-3 border border-slate-800/80 text-center flex items-center justify-between px-4">
-          <div class="flex items-center space-x-2.5">
-            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
-            <span id="scanner-status-text" class="text-xs font-medium text-slate-300">
-              Face scanner active • Stand in front of camera
-            </span>
-          </div>
-          <span class="text-[10px] text-slate-500 font-mono hidden sm:inline">Instant AI Recognition</span>
-        </div>
-      </div>
-
-      <!-- CAMERA STREAM VIEWFINDER (CLEAN, NO UGLY BOXES) -->
+      <!-- CAMERA STREAM VIEWFINDER (CLEAN, NO LASER ANIMATION, NO BOXES) -->
       <div class="relative w-full max-w-lg aspect-[4/3] rounded-3xl overflow-hidden glass-card border border-slate-800 shadow-2xl bg-slate-950 flex items-center justify-center">
-        
         <!-- Video Element -->
         <video id="video-stream" autoplay muted playsinline class="w-full h-full object-cover"></video>
         
-        <!-- Overlay Canvas for subtle scan feedback (no ugly bounding boxes) -->
-        <canvas id="overlay-canvas" class="absolute inset-0 pointer-events-none w-full h-full"></canvas>
-
-        <!-- Dynamic Laser Animation -->
-        <div id="scanner-laser" class="scanner-laser"></div>
+        <!-- Subtle Status Prompt Floating on Bottom Edge of Camera -->
+        <div class="absolute bottom-3 inset-x-4 pointer-events-none">
+          <div class="glass-card rounded-2xl py-2 px-3 text-center border border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
+            <span id="scanner-status-text" class="text-xs font-semibold text-slate-200">
+              Ready • Look at camera and tap Scan
+            </span>
+          </div>
+        </div>
       </div>
 
       <!-- BOTTOM SCANNER CONTROLS (ONLY SCAN FACE AND AUTO) -->
@@ -628,8 +572,8 @@
     </div>
   </div>
 
-  <!-- 4. WhatsApp QR Code Modal -->
-  <div id="qr-modal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+  <!-- 4. WhatsApp QR Code Modal (Web PC) -->
+  <div id="qr-modal" class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
     <div class="glass-card border border-slate-700/80 rounded-3xl max-w-xs w-full p-6 text-center space-y-4 shadow-2xl">
       <div class="flex justify-between items-center">
         <h3 class="font-extrabold text-white text-sm flex items-center">
@@ -639,7 +583,7 @@
           <i class="fa-solid fa-xmark text-base"></i>
         </button>
       </div>
-      <p class="text-xs text-slate-400 leading-snug">Open WhatsApp on your coaching phone ➔ Linked Devices ➔ Scan this QR code:</p>
+      <p class="text-xs text-slate-400 leading-snug">Open WhatsApp on institute phone ➔ Linked Devices ➔ Scan this QR code:</p>
       <div class="bg-white p-3 rounded-2xl inline-block mx-auto shadow-inner">
         <img id="qr-image" src="" alt="WhatsApp QR" class="w-48 h-48 mx-auto object-contain">
       </div>
