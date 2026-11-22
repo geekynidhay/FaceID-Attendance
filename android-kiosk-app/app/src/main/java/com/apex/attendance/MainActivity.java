@@ -5,6 +5,8 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -25,6 +27,9 @@ import androidx.core.content.ContextCompat;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.InterfaceAddress;
+import java.net.NetworkInterface;
+import java.util.Enumeration;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -53,22 +58,18 @@ public class MainActivity extends AppCompatActivity {
 
         setupWebView();
 
-        // 1. Check if we already have a saved server URL
+        // Check if we have a saved server URL
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String savedUrl = prefs.getString(KEY_SERVER_URL, null);
 
-        if (savedUrl != null && !savedUrl.isEmpty()) {
-            webView.loadUrl(savedUrl);
-        } else {
-            // 2. Zero-Config: Auto-discover the main coaching PC on the local Wi-Fi
-            discoverServerOnLocalWifi();
-        }
+        // Always attempt auto-discovery to adapt to dynamic Wi-Fi IP changes seamlessly
+        discoverServerOnLocalWifi(savedUrl);
     }
 
     /**
-     * Automatic Zero-Config Wi-Fi Broadcast Discovery
+     * Automatic Zero-Config Wi-Fi Broadcast Discovery with subnet sweep
      */
-    private void discoverServerOnLocalWifi() {
+    private void discoverServerOnLocalWifi(String fallbackUrl) {
         Toast.makeText(this, "Detecting Coaching PC on Wi-Fi...", Toast.LENGTH_SHORT).show();
 
         new Thread(() -> {
@@ -76,12 +77,12 @@ public class MainActivity extends AppCompatActivity {
             try {
                 socket = new DatagramSocket();
                 socket.setBroadcast(true);
-                socket.setSoTimeout(4000); // Wait up to 4s for PC beacon
+                socket.setSoTimeout(3500); // 3.5s timeout for fast response
 
                 String probeMessage = "DISCOVER_APEX_ATTENDANCE_SERVER";
                 byte[] sendData = probeMessage.getBytes();
 
-                // Broadcast packet to local subnet
+                // 1. Send broadcast to 255.255.255.255
                 DatagramPacket sendPacket = new DatagramPacket(
                         sendData,
                         sendData.length,
@@ -89,7 +90,25 @@ public class MainActivity extends AppCompatActivity {
                         DISCOVERY_PORT
                 );
                 socket.send(sendPacket);
-                Log.d(TAG, "Broadcast probe sent to 255.255.255.255:" + DISCOVERY_PORT);
+
+                // 2. Also send broadcast to all active network interface broadcast addresses
+                try {
+                    Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+                    while (interfaces.hasMoreElements()) {
+                        NetworkInterface networkInterface = interfaces.nextElement();
+                        if (networkInterface.isLoopback() || !networkInterface.isUp()) continue;
+
+                        for (InterfaceAddress interfaceAddress : networkInterface.getInterfaceAddresses()) {
+                            InetAddress broadcast = interfaceAddress.getBroadcast();
+                            if (broadcast != null) {
+                                DatagramPacket ifPacket = new DatagramPacket(sendData, sendData.length, broadcast, DISCOVERY_PORT);
+                                socket.send(ifPacket);
+                            }
+                        }
+                    }
+                } catch (Exception ignored) {}
+
+                Log.d(TAG, "Broadcast probes sent on UDP:" + DISCOVERY_PORT);
 
                 // Receive response from main PC
                 byte[] recvBuf = new byte[1024];
@@ -112,10 +131,13 @@ public class MainActivity extends AppCompatActivity {
                 });
 
             } catch (Exception e) {
-                Log.w(TAG, "Auto-discovery timeout, falling back to default or reverse", e);
+                Log.w(TAG, "Auto-discovery timeout, using fallback", e);
                 mainHandler.post(() -> {
-                    // Fallback to localhost or prompt
-                    webView.loadUrl(DEFAULT_URL);
+                    if (fallbackUrl != null && !fallbackUrl.isEmpty()) {
+                        webView.loadUrl(fallbackUrl);
+                    } else {
+                        webView.loadUrl(DEFAULT_URL);
+                    }
                 });
             } finally {
                 if (socket != null && !socket.isClosed()) {
@@ -144,9 +166,8 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
-                // If failed, trigger auto-discovery again or show prompt
                 if (!isServerDiscovered) {
-                    discoverServerOnLocalWifi();
+                    discoverServerOnLocalWifi(null);
                 } else {
                     showConfigDialog("Could not connect to " + failingUrl);
                 }
@@ -160,21 +181,28 @@ public class MainActivity extends AppCompatActivity {
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Server Configuration");
-        builder.setMessage(message != null ? message : "Enter Coaching Server URL:");
+        builder.setMessage(message != null ? message : "Enter Coaching PC IP Address or URL:");
 
         final EditText input = new EditText(this);
+        input.setHint("e.g. http://192.168.1.5:4000");
         input.setText(currentUrl);
         builder.setView(input);
 
         builder.setPositiveButton("Connect", (dialog, which) -> {
             String newUrl = input.getText().toString().trim();
             if (!newUrl.isEmpty()) {
+                if (!newUrl.startsWith("http://") && !newUrl.startsWith("https://")) {
+                    newUrl = "http://" + newUrl;
+                }
+                if (!newUrl.matches(".*:\\d+$")) {
+                    newUrl = newUrl + ":4000";
+                }
                 prefs.edit().putString(KEY_SERVER_URL, newUrl).apply();
                 webView.loadUrl(newUrl);
             }
         });
 
-        builder.setNegativeButton("Re-Scan Wi-Fi", (dialog, which) -> discoverServerOnLocalWifi());
+        builder.setNegativeButton("Re-Scan Wi-Fi", (dialog, which) -> discoverServerOnLocalWifi(null));
         builder.show();
     }
 

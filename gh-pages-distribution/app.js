@@ -28,18 +28,21 @@ function initDeviceIdentity() {
   }
 
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  if (!deviceName) {
+  
+  if (deviceName && deviceName.trim()) {
+    updateDeviceNameDisplay(deviceName.trim());
+  } else {
+    // If no staff name saved yet, prompt on mobile
     if (isMobile) {
-      const input = prompt("Enter this Phone's Name for Attendance Staff (e.g. Front Gate Phone, Lab S24):", "Staff Phone");
-      deviceName = (input && input.trim()) ? input.trim() : "Staff Phone " + Math.floor(10 + Math.random() * 90);
+      setTimeout(() => {
+        openStaffNameModal();
+      }, 500);
     } else {
       deviceName = "Admin PC";
+      localStorage.setItem('apex_device_name', deviceName);
+      updateDeviceNameDisplay(deviceName);
     }
-    localStorage.setItem('apex_device_name', deviceName);
   }
-
-  const nameDisplay = document.getElementById('device-name-display');
-  if (nameDisplay) nameDisplay.innerText = deviceName;
 
   // Hide remote staff phone selector on mobile phones
   const remoteToggleGroup = document.getElementById('remote-capture-toggle-group');
@@ -52,9 +55,49 @@ function initDeviceIdentity() {
   setInterval(sendDeviceHeartbeat, 15000);
 
   // If mobile or device name indicates staff phone, listen for incoming photo snap requests
-  if (isMobile || deviceName !== 'Admin PC') {
+  if (isMobile || (deviceName && deviceName !== 'Admin PC')) {
     startListeningForRemoteSnapRequests();
   }
+}
+
+function updateDeviceNameDisplay(name) {
+  const nameDisplay = document.getElementById('device-name-display');
+  if (nameDisplay) {
+    nameDisplay.innerText = name;
+  }
+}
+
+// Staff Name Modal Controls
+function promptChangeStaffName() {
+  openStaffNameModal();
+}
+
+function openStaffNameModal() {
+  const modal = document.getElementById('staff-name-modal');
+  const input = document.getElementById('staff-name-input');
+  if (modal && input) {
+    input.value = deviceName || '';
+    modal.classList.remove('hidden');
+    input.focus();
+  }
+}
+
+function closeStaffNameModal() {
+  const modal = document.getElementById('staff-name-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function saveStaffName() {
+  const input = document.getElementById('staff-name-input');
+  const enteredName = input ? input.value.trim() : '';
+
+  if (enteredName) {
+    deviceName = enteredName;
+    localStorage.setItem('apex_device_name', deviceName);
+    updateDeviceNameDisplay(deviceName);
+    sendDeviceHeartbeat();
+  }
+  closeStaffNameModal();
 }
 
 async function sendDeviceHeartbeat() {
@@ -62,7 +105,7 @@ async function sendDeviceHeartbeat() {
     await fetch(`${getApiBaseUrl()}/api/devices/heartbeat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ device_id: deviceId, device_name: deviceName })
+      body: JSON.stringify({ device_id: deviceId, device_name: deviceName || 'Staff Device' })
     });
   } catch (e) {}
 }
@@ -179,7 +222,7 @@ function resetServerConfig() {
   loadBatches();
 }
 
-// Auto-generate random unique Roll Number (e.g. DOT-8492)
+// Auto-generate random unique Roll Number
 function generateAutoRollNumber() {
   const rollInput = document.getElementById('reg-roll');
   if (rollInput) {
@@ -350,7 +393,7 @@ async function toggleCameraMirror() {
   await startScannerCamera();
 }
 
-// 4. Manual Scan on ENTER Key or Button
+// 4. Manual Scan on ENTER Key or Button (Clean View: No Ugly Bounding Boxes)
 async function triggerManualScan() {
   if (!isModelLoaded) {
     alert("AI Models are still loading. Please wait a second.");
@@ -363,15 +406,11 @@ async function triggerManualScan() {
   if (isProcessingAttendance) return;
 
   const btn = document.getElementById('btn-manual-scan');
-  const counter = document.getElementById('detected-counter');
   
   if (scannerLaser) scannerLaser.style.display = 'block';
-  if (counter) counter.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-ping';
   scannerStatusText.innerText = "Analyzing face...";
   if (btn) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Scanning...`;
 
-  const displaySize = { width: videoStream.videoWidth || 640, height: videoStream.videoHeight || 480 };
-  faceapi.matchDimensions(overlayCanvas, displaySize);
   const ctx = overlayCanvas.getContext('2d');
   ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
@@ -383,49 +422,30 @@ async function triggerManualScan() {
     .withFaceLandmarks()
     .withFaceDescriptors();
 
-    const resizedDetections = faceapi.resizeResults(detections, displaySize);
-
-    if (resizedDetections.length === 0) {
+    if (detections.length === 0) {
       scannerStatusText.innerText = "No face detected! Look directly into the camera and press Enter.";
-      if (counter) counter.className = 'w-2 h-2 rounded-full bg-rose-500';
     } else {
       if (!faceMatcher) {
         scannerStatusText.innerText = "No students registered yet! Go to the Register tab first.";
-        if (counter) counter.className = 'w-2 h-2 rounded-full bg-amber-500';
         return;
       }
 
       let matchFound = false;
-      for (const detection of resizedDetections) {
+      for (const detection of detections) {
         const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
-        const box = detection.detection.box;
 
         if (bestMatch.label !== 'unknown') {
           matchFound = true;
           const [studentId, name, roll, batch, parentPhone] = bestMatch.label.split('::');
 
-          const drawBox = new faceapi.draw.DrawBox(box, {
-            label: `${name} (${(1 - bestMatch.distance).toFixed(2) * 100}%)`,
-            boxColor: '#22c55e'
-          });
-          drawBox.draw(overlayCanvas);
-
           scannerStatusText.innerText = `Recognized: ${name}! Recording attendance...`;
-          if (counter) counter.className = 'w-2 h-2 rounded-full bg-emerald-500';
           await handleAttendanceTrigger(studentId, name, roll, batch, parentPhone);
           break;
-        } else {
-          const drawBox = new faceapi.draw.DrawBox(box, {
-            label: 'Unregistered Student',
-            boxColor: '#f43f5e'
-          });
-          drawBox.draw(overlayCanvas);
         }
       }
 
       if (!matchFound) {
         scannerStatusText.innerText = "Face not recognized. Student not found in registration database.";
-        if (counter) counter.className = 'w-2 h-2 rounded-full bg-rose-500';
       }
     }
   } catch (err) {
@@ -435,7 +455,6 @@ async function triggerManualScan() {
     setTimeout(() => {
       if (scannerLaser && !isContinuousScanning) scannerLaser.style.display = 'none';
       if (btn) btn.innerHTML = `<i class="fa-solid fa-expand text-base"></i><span>Scan Face (Enter)</span>`;
-      if (counter && !isContinuousScanning) counter.className = 'w-2 h-2 rounded-full bg-slate-500';
     }, 1200);
   }
 }
@@ -1192,7 +1211,6 @@ function exportStudentsToExcel() {
     return;
   }
 
-  // Format student records for Excel spreadsheet
   const excelData = allStudentsCache.map((st, index) => ({
     "S.No": index + 1,
     "Roll No": st.roll_no || '',
@@ -1207,17 +1225,16 @@ function exportStudentsToExcel() {
 
   const worksheet = XLSX.utils.json_to_sheet(excelData);
 
-  // Set column widths for readability
   worksheet['!cols'] = [
-    { wch: 6 },  // S.No
-    { wch: 12 }, // Roll No
-    { wch: 22 }, // Student Name
-    { wch: 18 }, // Batch
-    { wch: 20 }, // Father Name
-    { wch: 20 }, // Mother Name
-    { wch: 16 }, // Primary Phone
-    { wch: 16 }, // Secondary Phone
-    { wch: 16 }  // Registration Date
+    { wch: 6 },
+    { wch: 12 },
+    { wch: 22 },
+    { wch: 18 },
+    { wch: 20 },
+    { wch: 20 },
+    { wch: 16 },
+    { wch: 16 },
+    { wch: 16 }
   ];
 
   const workbook = XLSX.utils.book_new();
@@ -1295,21 +1312,21 @@ async function checkWhatsAppStatus() {
 
     if (data.config.simulate) {
       if (textEl) textEl.innerText = "Simulated";
-      if (pill) pill.className = "cursor-pointer inline-flex items-center space-x-1.5 mt-0.5 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400";
+      if (pill) pill.className = "cursor-pointer inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400";
     } else if (data.service && (data.service.status === 'authenticated' || data.service.status === 'ready' || data.service.status === 'CONNECTED')) {
-      if (textEl) textEl.innerText = (data.service.pushName || 'WhatsApp Active');
-      if (pill) pill.className = "cursor-pointer inline-flex items-center space-x-1.5 mt-0.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400";
+      if (textEl) textEl.innerText = (data.service.pushName || 'Active');
+      if (pill) pill.className = "cursor-pointer inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400";
       closeQRCodeModal();
     } else if (data.service && data.service.status === 'qr_ready') {
-      if (textEl) textEl.innerText = "Scan WhatsApp QR";
-      if (pill) pill.className = "cursor-pointer inline-flex items-center space-x-1.5 mt-0.5 px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 animate-pulse";
+      if (textEl) textEl.innerText = "Scan QR";
+      if (pill) pill.className = "cursor-pointer inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 animate-pulse";
     } else {
-      if (textEl) textEl.innerText = "WhatsApp Offline";
-      if (pill) pill.className = "cursor-pointer inline-flex items-center space-x-1.5 mt-0.5 px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400";
+      if (textEl) textEl.innerText = "Offline";
+      if (pill) pill.className = "cursor-pointer inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400";
     }
   } catch (err) {
-    if (textEl) textEl.innerText = "Server Disconnected";
-    if (pill) pill.className = "cursor-pointer inline-flex items-center space-x-1.5 mt-0.5 px-2 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400";
+    if (textEl) textEl.innerText = "Offline";
+    if (pill) pill.className = "cursor-pointer inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400";
   }
 }
 

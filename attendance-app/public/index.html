@@ -86,22 +86,20 @@
         <div>
           <div class="flex items-center space-x-2">
             <h1 class="font-black text-sm md:text-base tracking-tight text-white flex items-center">
-              Apex Smart Kiosk
+              DOT-CMC Computer Center
             </h1>
-            <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              DOT-CMC
-            </span>
           </div>
-          <div class="flex items-center space-x-2">
+          <div class="flex items-center space-x-2 mt-0.5">
+            <!-- Staff Name Pill (Click to rename) -->
+            <button onclick="promptChangeStaffName()" title="Click to rename staff" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 hover:border-indigo-400 transition">
+              <i class="fa-solid fa-user-tag mr-1 text-[9px] text-indigo-400"></i>
+              <span id="device-name-display">Staff</span>
+            </button>
             <!-- WhatsApp Pill -->
-            <div id="wa-pill" onclick="handleWhatsAppPillClick()" class="cursor-pointer inline-flex items-center space-x-1.5 mt-0.5 px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400 hover:border-emerald-500 transition">
-              <i class="fa-brands fa-whatsapp text-xs"></i>
-              <span id="wa-status-text" class="text-[10px] font-semibold">Connecting WhatsApp...</span>
+            <div id="wa-pill" onclick="handleWhatsAppPillClick()" class="cursor-pointer inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-slate-800/90 border border-slate-700 text-slate-400 hover:border-emerald-500 transition">
+              <i class="fa-brands fa-whatsapp text-[10px]"></i>
+              <span id="wa-status-text" class="text-[9px] font-semibold">WhatsApp</span>
             </div>
-            <!-- Staff Phone Pill -->
-            <span id="device-identity-badge" class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-              <i class="fa-solid fa-mobile-screen mr-1 text-[9px]"></i> <span id="device-name-display">Staff Device</span>
-            </span>
           </div>
         </div>
       </div>
@@ -192,24 +190,17 @@
         </div>
       </div>
 
-      <!-- CAMERA STREAM VIEWFINDER -->
+      <!-- CAMERA STREAM VIEWFINDER (CLEAN, NO UGLY BOXES) -->
       <div class="relative w-full max-w-lg aspect-[4/3] rounded-3xl overflow-hidden glass-card border border-slate-800 shadow-2xl bg-slate-950 flex items-center justify-center">
         
         <!-- Video Element -->
         <video id="video-stream" autoplay muted playsinline class="w-full h-full object-cover"></video>
         
-        <!-- Overlay Canvas for Bounding Boxes -->
+        <!-- Overlay Canvas for subtle scan feedback (no ugly bounding boxes) -->
         <canvas id="overlay-canvas" class="absolute inset-0 pointer-events-none w-full h-full"></canvas>
 
         <!-- Dynamic Laser Animation -->
         <div id="scanner-laser" class="scanner-laser"></div>
-
-        <!-- Reticle Face Guide (Dotted Oval) -->
-        <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
-          <div class="w-48 h-64 border-2 border-dashed border-emerald-400/50 rounded-full transition-all duration-300 flex items-center justify-center">
-            <div class="w-2 h-2 rounded-full bg-emerald-400/70" id="detected-counter"></div>
-          </div>
-        </div>
       </div>
 
       <!-- BOTTOM SCANNER CONTROLS (ONLY SCAN FACE AND AUTO) -->
@@ -334,9 +325,6 @@
               <div id="local-capture-container">
                 <div class="relative w-full aspect-video rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center">
                   <video id="reg-video" autoplay muted playsinline class="w-full h-full object-cover"></video>
-                  <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div class="w-32 h-40 border-2 border-dashed border-emerald-400/80 rounded-2xl"></div>
-                  </div>
                 </div>
 
                 <div class="flex items-center justify-between pt-2">
@@ -491,6 +479,31 @@
   </nav>
 
   <!-- ================= MODALS ================= -->
+
+  <!-- Staff Name Prompt Modal (Clean in-app modal instead of browser prompt) -->
+  <div id="staff-name-modal" class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
+    <div class="glass-card border border-slate-700/80 rounded-3xl max-w-xs w-full p-6 text-center space-y-4 shadow-2xl">
+      <div class="w-12 h-12 mx-auto rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xl">
+        <i class="fa-solid fa-user-tag"></i>
+      </div>
+      <div>
+        <h3 class="text-base font-extrabold text-white">Staff Member Name</h3>
+        <p class="text-xs text-slate-400 mt-1">Enter your name for attendance tracking:</p>
+      </div>
+
+      <input type="text" id="staff-name-input" placeholder="e.g. Nidhay Rathore" 
+             class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 text-center font-bold">
+
+      <div class="grid grid-cols-2 gap-2 pt-1">
+        <button onclick="saveStaffName()" class="py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-extrabold rounded-xl text-xs transition">
+          SAVE
+        </button>
+        <button onclick="closeStaffNameModal()" class="py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 font-bold rounded-xl text-xs transition">
+          SKIP
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- 1. Edit Student Modal -->
   <div id="edit-student-modal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
