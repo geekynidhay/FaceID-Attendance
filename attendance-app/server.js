@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const db = require('./database');
-const { sendAttendanceAlert, checkSessionStatus } = require('./whatsapp');
+const { sendAttendanceAlert, sendWelcomeRegistrationAlert, checkSessionStatus } = require('./whatsapp');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -15,7 +15,110 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Serve frontend assets
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ================= API ENDPOINTS ================= //
+// Temporary in-memory phone capture requests: { [requestId]: { student_name, device_id, status: 'PENDING'|'COMPLETED', face_descriptor: null } }
+const remoteCaptureRequests = {};
+
+// Active online phones { [deviceId]: { name, lastSeen: timestamp } }
+const connectedPhones = {};
+
+/**
+ * 0. Phone Heartbeat / Registration
+ */
+app.post('/api/devices/heartbeat', (req, res) => {
+  const { device_id, device_name } = req.body;
+  if (!device_id) return res.status(400).json({ error: 'device_id required' });
+  connectedPhones[device_id] = {
+    id: device_id,
+    name: device_name || 'Staff Phone',
+    lastSeen: Date.now()
+  };
+  res.json({ success: true, count: Object.keys(connectedPhones).length });
+});
+
+/**
+ * List online devices for photo capture selection
+ */
+app.get('/api/devices/list', (req, res) => {
+  const now = Date.now();
+  // Filter devices seen in the last 60 seconds
+  const list = Object.values(connectedPhones).filter(d => now - d.lastSeen < 60000);
+  res.json(list);
+});
+
+/**
+ * Create Remote Capture Request (Triggered by Web when choosing a staff phone)
+ */
+app.post('/api/remote-capture/create', (req, res) => {
+  const { device_id, student_name } = req.body;
+  if (!device_id || !student_name) return res.status(400).json({ error: 'device_id and student_name required' });
+
+  const requestId = 'CAP_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+  remoteCaptureRequests[requestId] = {
+    requestId,
+    device_id,
+    student_name,
+    status: 'PENDING',
+    face_descriptor: null,
+    createdAt: Date.now()
+  };
+
+  res.json({ success: true, requestId });
+});
+
+/**
+ * Poll for Remote Capture Task (Phone polls this)
+ */
+app.get('/api/remote-capture/pending/:deviceId', (req, res) => {
+  const { deviceId } = req.params;
+  const pending = Object.values(remoteCaptureRequests).find(r => r.device_id === deviceId && r.status === 'PENDING');
+  res.json(pending || null);
+});
+
+/**
+ * Submit Remote Capture Face Descriptor (Phone sends this)
+ */
+app.post('/api/remote-capture/submit', (req, res) => {
+  const { requestId, face_descriptor } = req.body;
+  if (!requestId || !face_descriptor) return res.status(400).json({ error: 'requestId and face_descriptor required' });
+
+  if (remoteCaptureRequests[requestId]) {
+    remoteCaptureRequests[requestId].face_descriptor = face_descriptor;
+    remoteCaptureRequests[requestId].status = 'COMPLETED';
+    return res.json({ success: true });
+  }
+  res.status(404).json({ error: 'Request not found' });
+});
+
+/**
+ * Check Remote Capture Status (Web polls this)
+ */
+app.get('/api/remote-capture/status/:requestId', (req, res) => {
+  const { requestId } = req.params;
+  const task = remoteCaptureRequests[requestId];
+  if (!task) return res.status(404).json({ error: 'Request not found' });
+  res.json(task);
+});
+
+/**
+ * Delete Student (Admin Mode)
+ */
+app.delete('/api/students/:id', (req, res) => {
+  const { id } = req.params;
+  db.run('DELETE FROM students WHERE id = ?', [id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, deleted: this.changes });
+  });
+});
+
+/**
+ * Get all students list for Admin Mode
+ */
+app.get('/api/students/list', (req, res) => {
+  db.all('SELECT id, name, roll_no, batch, parent_name, parent_phone, created_at FROM students ORDER BY id DESC', [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
 
 /**
  * 1. Register a new student with face descriptor
@@ -46,6 +149,11 @@ app.post('/api/students/register', (req, res) => {
       }
       return res.status(500).json({ error: err.message });
     }
+
+    // Send Welcome WhatsApp Message to parent in background
+    sendWelcomeRegistrationAlert(name.trim(), parent_phone.trim())
+      .catch(wErr => console.error('Error sending welcome WhatsApp:', wErr));
+
     res.json({
       success: true,
       message: 'Student registered successfully',

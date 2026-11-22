@@ -92,8 +92,60 @@ async function checkSessionStatus() {
   }
 }
 
+/**
+ * Send Welcome Registration Message to Parent
+ */
+async function sendWelcomeRegistrationAlert(studentName, parentPhone) {
+  const jid = formatWhatsAppJid(parentPhone);
+  const message = `🎉 *Welcome to ${INSTITUTE_NAME}*\n\n` +
+    `Dear Parent,\n` +
+    `We are pleased to inform you that *${studentName}* has been successfully registered at ${INSTITUTE_NAME}.\n\n` +
+    `📌 *Important Notice:*\n` +
+    `Please *save this WhatsApp number* to your contacts. You will receive all daily arrival and departure attendance alerts for *${studentName}* directly from this number.\n\n` +
+    `For any queries, assistance, or guidance, feel free to contact us:\n` +
+    `📞 *9685192443*\n` +
+    `📞 *07562796465*\n\n` +
+    `----------------------------------\n\n` +
+    `प्रिय अभिभावक,\n` +
+    `हमें आपको सूचित करते हुए अत्यंत प्रसन्नता हो रही है कि *${studentName}* का पंजीकरण ${INSTITUTE_NAME} में सफलतापूर्वक हो गया है।\n\n` +
+    `📌 *महत्वपूर्ण सूचना:*\n` +
+    `कृपया *इस व्हाट्सएप नंबर को अपने संपर्कों (Contacts) में सेव कर लें।* *${studentName}* के दैनिक आने और जाने (उपस्थिति) के सभी संदेश आपको इसी नंबर से प्राप्त होंगे।\n\n` +
+    `किसी भी प्रकार की जानकारी, सहायता या मार्गदर्शन के लिए आप हमसे संपर्क कर सकते हैं:\n` +
+    `📞 *9685192443*\n` +
+    `📞 *07562796465*`;
+
+  if (SIMULATE) {
+    console.log(`[SIMULATE WHATSAPP WELCOME] Sending to ${jid}:\n${message}`);
+    return { success: true, simulated: true, jid, message };
+  }
+
+  try {
+    const url = `${OPENWA_BASE_URL}/api/sessions/${OPENWA_SESSION}/messages/send-text`;
+    const headers = { 
+      'Content-Type': 'application/json',
+      'X-Api-Key': OPENWA_API_KEY
+    };
+
+    const res = await axios.post(url, {
+      chatId: jid,
+      text: message
+    }, {
+      headers,
+      timeout: 10000
+    });
+
+    console.log(`[WHATSAPP WELCOME SENT] Delivered to ${jid}:`, res.data);
+    return { success: true, response: res.data };
+  } catch (error) {
+    const errMsg = error.response ? JSON.stringify(error.response.data) : error.message;
+    console.error(`[WHATSAPP WELCOME ERROR] Failed to send to ${jid}:`, errMsg);
+    return { success: false, error: errMsg };
+  }
+}
+
 module.exports = {
   sendAttendanceAlert,
+  sendWelcomeRegistrationAlert,
   checkSessionStatus,
   formatWhatsAppJid
 };

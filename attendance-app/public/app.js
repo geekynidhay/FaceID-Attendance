@@ -9,15 +9,67 @@ let isContinuousScanning = false;
 let isProcessingAttendance = false;
 let deferredPrompt = null;
 
+// Multi-phone identification & Remote Snap State
+let deviceId = localStorage.getItem('apex_device_id');
+let deviceName = localStorage.getItem('apex_device_name');
+let activeRemoteCapturePolling = null;
+let currentIncomingSnapTask = null;
+let snapCameraStream = null;
+
+// Initialize Device Identity
+function initDeviceIdentity() {
+  if (!deviceId) {
+    deviceId = 'dev_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now().toString(36);
+    localStorage.setItem('apex_device_id', deviceId);
+  }
+
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  if (!deviceName) {
+    if (isMobile) {
+      const input = prompt("Enter this Phone's Name for Attendance Staff (e.g. Front Gate Phone, Lab S24):", "Staff Phone");
+      deviceName = (input && input.trim()) ? input.trim() : "Staff Phone " + Math.floor(10 + Math.random() * 90);
+    } else {
+      deviceName = "Admin PC";
+    }
+    localStorage.setItem('apex_device_name', deviceName);
+  }
+
+  // Hide remote staff phone selector on mobile phones
+  const remoteToggleGroup = document.getElementById('remote-capture-toggle-group');
+  if (remoteToggleGroup && isMobile) {
+    remoteToggleGroup.classList.add('hidden');
+  }
+
+  // Start phone heartbeat
+  sendDeviceHeartbeat();
+  setInterval(sendDeviceHeartbeat, 15000);
+
+  // If mobile or device name indicates staff phone, listen for incoming photo snap requests
+  if (isMobile || deviceName !== 'Admin PC') {
+    startListeningForRemoteSnapRequests();
+  }
+}
+
+async function sendDeviceHeartbeat() {
+  try {
+    await fetch(`${getApiBaseUrl()}/api/devices/heartbeat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device_id: deviceId, device_name: deviceName })
+    });
+  } catch (e) {
+    // Silent fail if offline
+  }
+}
+
 // Dynamic Backend URL (supports both same-origin local & GitHub Pages pointing to remote server)
 function getApiBaseUrl() {
   const savedUrl = localStorage.getItem('custom_backend_url');
   if (savedUrl && savedUrl.trim() !== '') {
     return savedUrl.trim().replace(/\/+$/, '');
   }
-  // Default: if running on github.io or file:, use blank or prompt
   if (window.location.hostname.includes('github.io')) {
-    return 'http://localhost:4000'; // Default fallback, customizable via Settings gear
+    return 'http://localhost:4000';
   }
   return '';
 }
@@ -36,6 +88,8 @@ const scannerLaser = document.getElementById('scanner-laser');
 
 // Initialize on page load
 window.addEventListener('DOMContentLoaded', async () => {
+  initDeviceIdentity();
+
   // Register PWA Service Worker
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js')
@@ -51,6 +105,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (installBtn) installBtn.classList.remove('hidden');
   });
 
+  generateAutoRollNumber();
   await loadAIModels();
   await reloadRegisteredFaces();
   await checkWhatsAppStatus();
@@ -157,9 +212,33 @@ function switchTab(tabId) {
   if (tabId === 'register') {
     startRegisterCamera();
     generateAutoRollNumber();
+    refreshOnlineStaffPhones();
   } else if (tabId === 'scan') {
     startScannerCamera();
   } else if (tabId === 'logs') {
+    loadAdminStudents();
+    loadAttendanceLogs();
+  }
+}
+
+// Admin Sub-Tab Switching (Students vs Logs)
+function switchAdminSubTab(subTab) {
+  const studentsView = document.getElementById('admin-view-students');
+  const logsView = document.getElementById('admin-view-logs');
+  const btnStudents = document.getElementById('admin-sub-students');
+  const btnLogs = document.getElementById('admin-sub-logs');
+
+  if (subTab === 'students') {
+    studentsView.classList.remove('hidden');
+    logsView.classList.add('hidden');
+    btnStudents.className = "px-3.5 py-1.5 rounded-lg bg-emerald-600 text-white font-bold transition";
+    btnLogs.className = "px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white font-semibold transition";
+    loadAdminStudents();
+  } else {
+    studentsView.classList.add('hidden');
+    logsView.classList.remove('hidden');
+    btnLogs.className = "px-3.5 py-1.5 rounded-lg bg-emerald-600 text-white font-bold transition";
+    btnStudents.className = "px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white font-semibold transition";
     loadAttendanceLogs();
   }
 }
@@ -188,18 +267,18 @@ async function reloadRegisteredFaces() {
   try {
     const res = await fetch(`${getApiBaseUrl()}/api/students/descriptors`);
     const students = await res.json();
-    facesCountSpan.innerText = students.length;
+    if (facesCountSpan) facesCountSpan.innerText = students.length;
+
+    const adminCount = document.getElementById('admin-students-count');
+    if (adminCount) adminCount.innerText = students.length;
 
     if (students.length > 0) {
       const labeledDescriptors = students.map(st => {
-        // Float32Array required by face-api
         const descriptorArray = new Float32Array(st.face_descriptor);
-        // Label format: studentId::name::roll::batch::parentPhone
         const label = `${st.id}::${st.name}::${st.roll_no}::${st.batch || ''}::${st.parent_phone}`;
         return new faceapi.LabeledFaceDescriptors(label, [descriptorArray]);
       });
 
-      // Distance threshold: 0.55 (lower = stricter match)
       faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.55);
       console.log(`Face Matcher initialized with ${students.length} students.`);
     } else {
@@ -236,7 +315,6 @@ async function startScannerCamera() {
 
     videoStream.onloadedmetadata = () => {
       videoStream.play();
-      startFaceDetectionLoop();
     };
   } catch (err) {
     console.error("Camera access error:", err);
@@ -257,7 +335,7 @@ async function triggerManualScan() {
     alert("AI Models are still loading. Please wait a second.");
     return;
   }
-  if (videoStream.paused || videoStream.ended) {
+  if (!videoStream.srcObject || videoStream.paused || videoStream.ended) {
     alert("Camera is not active.");
     return;
   }
@@ -341,11 +419,10 @@ async function triggerManualScan() {
   }
 }
 
-// Toggle continuous auto-scanning (optional)
+// Toggle continuous auto-scanning
 function toggleContinuousScan() {
   isContinuousScanning = !isContinuousScanning;
   const statusEl = document.getElementById('auto-scan-status');
-  const btn = document.getElementById('btn-toggle-continuous');
 
   if (isContinuousScanning) {
     statusEl.innerText = "ON";
@@ -367,12 +444,7 @@ function startContinuousLoop() {
     if (isContinuousScanning && !isProcessingAttendance) {
       triggerManualScan();
     }
-  }, 1000);
-}
-
-// Stub old function
-function startFaceDetectionLoop() {
-  // Manual trigger mode by default
+  }, 1200);
 }
 
 let pendingLeaveStudent = null;
@@ -382,7 +454,7 @@ async function handleAttendanceTrigger(studentId, name, roll, batch, parentPhone
   isProcessingAttendance = true;
 
   try {
-    // First, check student status: are they entering or leaving?
+    // Check student status: are they currently inside?
     const checkRes = await fetch(`${getApiBaseUrl()}/api/attendance/check-status`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -392,7 +464,7 @@ async function handleAttendanceTrigger(studentId, name, roll, batch, parentPhone
     const statusData = await checkRes.json();
 
     if (statusData.isInside) {
-      // Student is already inside! Show popup: "is student leaving?"
+      // Student is already inside! Show popup: "Rahul Sharma is leaving the institute?"
       pendingLeaveStudent = { studentId, name, roll, batch, parentPhone };
       showLeaveConfirmationPopup(name);
       return;
@@ -452,11 +524,11 @@ async function executeAttendanceMark(studentId, actionType) {
   } finally {
     setTimeout(() => {
       isProcessingAttendance = false;
-    }, 4000);
+    }, 3500);
   }
 }
 
-// Show Confirmation Card
+// Show Confirmation Card at top of scanner
 function showCheckinSuccess(data) {
   checkinBlank.classList.add('hidden');
   checkinResult.classList.remove('hidden');
@@ -464,7 +536,7 @@ function showCheckinSuccess(data) {
   const isExit = data.type === 'EXIT';
 
   document.getElementById('res-student-name').innerText = data.student.name;
-  document.getElementById('res-roll-batch').innerText = `${data.student.batch || 'General Batch'} • ${isExit ? 'LEFT' : 'ENTERED'}`;
+  document.getElementById('res-roll-batch').innerText = `${data.student.batch || 'General Batch'} • ${isExit ? 'LEFT INSTITUTE' : 'ENTERED INSTITUTE'}`;
   document.getElementById('res-checkin-time').innerText = `${data.time || new Date().toLocaleTimeString()}`;
   document.getElementById('res-parent-phone').innerText = data.student.parent_phone;
 
@@ -474,13 +546,12 @@ function showCheckinSuccess(data) {
     waBadge.innerText = "ALREADY RECORDED";
     waBadge.className = "px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-wide uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30";
   } else {
-    waBadge.innerText = isExit ? "EXIT DISPATCHED" : "ENTRY DISPATCHED";
+    waBadge.innerText = isExit ? "EXIT NOTIFIED" : "ARRIVAL NOTIFIED";
     waBadge.className = isExit 
       ? "px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-wide uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30"
       : "px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-wide uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
   }
 
-  // Audio chime feedback
   playSuccessSound();
 }
 
@@ -492,8 +563,8 @@ function playSuccessSound() {
     osc.connect(gain);
     gain.connect(ctx.destination);
     osc.type = "sine";
-    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-    osc.frequency.setValueAtTime(880.00, ctx.currentTime + 0.1); // A5
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+    osc.frequency.setValueAtTime(880.00, ctx.currentTime + 0.1);
     gain.gain.setValueAtTime(0.15, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
     osc.start();
@@ -501,7 +572,7 @@ function playSuccessSound() {
   } catch (e) {}
 }
 
-// 6. Camera for Student Registration
+// 6. Camera for Student Registration (Local Mode)
 async function startRegisterCamera() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -516,7 +587,227 @@ async function startRegisterCamera() {
   }
 }
 
-// Capture face descriptor for Registration
+// Switch between "This PC" local camera & "Staff Phone"
+function setCaptureMode(mode) {
+  const localContainer = document.getElementById('local-capture-container');
+  const remoteContainer = document.getElementById('remote-capture-container');
+  const btnLocal = document.getElementById('btn-mode-local');
+  const btnRemote = document.getElementById('btn-mode-remote');
+
+  if (mode === 'local') {
+    localContainer.classList.remove('hidden');
+    remoteContainer.classList.add('hidden');
+    btnLocal.className = "px-2.5 py-1 rounded-lg font-bold bg-emerald-600 text-white transition";
+    btnRemote.className = "px-2.5 py-1 rounded-lg font-semibold text-slate-400 hover:text-white transition";
+    startRegisterCamera();
+  } else {
+    localContainer.classList.add('hidden');
+    remoteContainer.classList.remove('hidden');
+    btnRemote.className = "px-2.5 py-1 rounded-lg font-bold bg-indigo-600 text-white transition";
+    btnLocal.className = "px-2.5 py-1 rounded-lg font-semibold text-slate-400 hover:text-white transition";
+    refreshOnlineStaffPhones();
+  }
+}
+
+// Fetch list of online staff phones for remote capture dropdown
+async function refreshOnlineStaffPhones() {
+  const select = document.getElementById('select-remote-device');
+  if (!select) return;
+
+  try {
+    const res = await fetch(`${getApiBaseUrl()}/api/devices/list`);
+    const devices = await res.json();
+
+    // Filter out our own device id
+    const otherDevices = devices.filter(d => d.id !== deviceId);
+
+    if (otherDevices.length === 0) {
+      select.innerHTML = `<option value="">No staff phones detected online</option>`;
+    } else {
+      select.innerHTML = otherDevices.map(d => `
+        <option value="${d.id}">${d.name} (${d.id.substring(0, 8)})</option>
+      `).join('');
+    }
+  } catch (err) {
+    select.innerHTML = `<option value="">Error detecting staff phones</option>`;
+  }
+}
+
+// Send Remote Snap Request to Staff Phone
+let activeRemoteRequestId = null;
+let remoteStatusPollTimer = null;
+
+async function dispatchRemoteCaptureRequest() {
+  const studentNameInput = document.getElementById('reg-name');
+  const studentName = studentNameInput ? studentNameInput.value.trim() : '';
+  if (!studentName) {
+    alert("Please enter the student's name first!");
+    studentNameInput?.focus();
+    return;
+  }
+
+  const select = document.getElementById('select-remote-device');
+  const targetDeviceId = select?.value;
+
+  if (!targetDeviceId) {
+    alert("Please select an online staff phone from the dropdown.");
+    return;
+  }
+
+  const sendBtn = document.getElementById('btn-send-remote-req');
+  const banner = document.getElementById('remote-status-banner');
+
+  sendBtn.disabled = true;
+  sendBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Sending to phone...`;
+  banner.classList.remove('hidden');
+  banner.innerText = `Request sent to staff phone! Popup triggered. Waiting for photo...`;
+
+  try {
+    const res = await fetch(`${getApiBaseUrl()}/api/remote-capture/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device_id: targetDeviceId, student_name: studentName })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Failed to trigger snap");
+
+    activeRemoteRequestId = data.requestId;
+
+    // Start polling status
+    if (remoteStatusPollTimer) clearInterval(remoteStatusPollTimer);
+    remoteStatusPollTimer = setInterval(pollRemoteCaptureStatus, 1500);
+
+  } catch (err) {
+    alert("Error: " + err.message);
+    sendBtn.disabled = false;
+    sendBtn.innerHTML = `<i class="fa-solid fa-paper-plane mr-1.5"></i> Send Snap Request to Phone`;
+    banner.classList.add('hidden');
+  }
+}
+
+// Poll status of remote capture
+async function pollRemoteCaptureStatus() {
+  if (!activeRemoteRequestId) return;
+
+  try {
+    const res = await fetch(`${getApiBaseUrl()}/api/remote-capture/status/${activeRemoteRequestId}`);
+    const task = await res.json();
+
+    if (task && task.status === 'COMPLETED' && task.face_descriptor) {
+      clearInterval(remoteStatusPollTimer);
+      remoteStatusPollTimer = null;
+      activeRemoteRequestId = null;
+
+      capturedRegistrationDescriptor = task.face_descriptor;
+
+      const banner = document.getElementById('remote-status-banner');
+      banner.className = "text-xs text-emerald-400 pt-1 font-bold";
+      banner.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> Face successfully received from staff phone!`;
+
+      const sendBtn = document.getElementById('btn-send-remote-req');
+      sendBtn.disabled = false;
+      sendBtn.innerHTML = `<i class="fa-solid fa-check mr-1.5"></i> Photo Synced`;
+
+      const ind = document.getElementById('face-captured-indicator');
+      if (ind) {
+        ind.innerHTML = `<span class="text-emerald-400"><i class="fa-solid fa-check mr-1"></i> Received from Phone (128 vectors)</span>`;
+      }
+    }
+  } catch (e) {}
+}
+
+// ================= PHONE RECEIVER: REMOTE SNAP POPUP ================= //
+function startListeningForRemoteSnapRequests() {
+  if (activeRemoteCapturePolling) clearInterval(activeRemoteCapturePolling);
+  activeRemoteCapturePolling = setInterval(async () => {
+    // Only poll if snap modal is not currently open
+    const modal = document.getElementById('incoming-snap-modal');
+    if (!modal.classList.contains('hidden')) return;
+
+    try {
+      const res = await fetch(`${getApiBaseUrl()}/api/remote-capture/pending/${deviceId}`);
+      const task = await res.json();
+      if (task && task.requestId) {
+        showRemoteSnapModal(task);
+      }
+    } catch (e) {}
+  }, 2000);
+}
+
+async function showRemoteSnapModal(task) {
+  currentIncomingSnapTask = task;
+  document.getElementById('snap-target-name').innerText = task.student_name;
+  document.getElementById('incoming-snap-modal').classList.remove('hidden');
+
+  // Start phone camera for snap modal
+  try {
+    const snapVid = document.getElementById('snap-phone-video');
+    snapCameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 480, height: 480, facingMode: { ideal: 'user' } },
+      audio: false
+    });
+    snapVid.srcObject = snapCameraStream;
+    snapVid.play();
+  } catch (err) {
+    alert("Camera error on staff phone: " + err.message);
+  }
+}
+
+async function submitRemoteSnap() {
+  if (!currentIncomingSnapTask) return;
+
+  const btn = document.getElementById('btn-snap-submit');
+  btn.disabled = true;
+  btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i> Extracting...`;
+
+  try {
+    const snapVid = document.getElementById('snap-phone-video');
+    const detection = await faceapi.detectSingleFace(
+      snapVid,
+      new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })
+    )
+    .withFaceLandmarks()
+    .withFaceDescriptor();
+
+    if (!detection) {
+      alert("No face detected! Look directly into the phone camera.");
+      btn.disabled = false;
+      btn.innerText = "SNAP & SEND";
+      return;
+    }
+
+    const descriptorArray = Array.from(detection.descriptor);
+
+    await fetch(`${getApiBaseUrl()}/api/remote-capture/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestId: currentIncomingSnapTask.requestId,
+        face_descriptor: descriptorArray
+      })
+    });
+
+    dismissRemoteSnap();
+    alert(`Photo for "${currentIncomingSnapTask.student_name}" sent to PC successfully!`);
+
+  } catch (err) {
+    alert("Failed to submit photo: " + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerText = "SNAP & SEND";
+  }
+}
+
+function dismissRemoteSnap() {
+  document.getElementById('incoming-snap-modal').classList.add('hidden');
+  if (snapCameraStream) {
+    snapCameraStream.getTracks().forEach(t => t.stop());
+    snapCameraStream = null;
+  }
+  currentIncomingSnapTask = null;
+}
+
+// Local Capture face descriptor for Registration
 async function captureFaceForRegistration() {
   const indicator = document.getElementById('face-captured-indicator');
   indicator.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i> Extracting facial features...`;
@@ -535,7 +826,6 @@ async function captureFaceForRegistration() {
       return;
     }
 
-    // Convert Float32Array to standard array for JSON storage
     capturedRegistrationDescriptor = Array.from(detection.descriptor);
     indicator.innerHTML = `<span class="text-emerald-400"><i class="fa-solid fa-check mr-1"></i> Face captured successfully! (128 vectors)</span>`;
   } catch (err) {
@@ -556,14 +846,14 @@ async function handleRegistration(e) {
     name: document.getElementById('reg-name').value,
     roll_no: document.getElementById('reg-roll').value,
     batch: document.getElementById('reg-batch').value,
-    parent_name: document.getElementById('reg-parent-name').value,
+    parent_name: '',
     parent_phone: document.getElementById('reg-parent-phone').value,
     face_descriptor: capturedRegistrationDescriptor
   };
 
   const submitBtn = document.getElementById('btn-submit-reg');
   submitBtn.disabled = true;
-  submitBtn.innerText = "Registering...";
+  submitBtn.innerText = "Registering & Sending WhatsApp...";
 
   try {
     const res = await fetch(`${getApiBaseUrl()}/api/students/register`, {
@@ -575,10 +865,17 @@ async function handleRegistration(e) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Registration failed");
 
-    alert(`Student "${payload.name}" registered successfully!`);
+    alert(`Student "${payload.name}" registered successfully!\nWelcome message dispatched to parent.`);
     document.getElementById('register-form').reset();
     capturedRegistrationDescriptor = null;
-    document.getElementById('face-captured-indicator').innerHTML = `<span class="text-amber-400"><i class="fa-solid fa-triangle-exclamation mr-1"></i> No face captured yet</span>`;
+    document.getElementById('face-captured-indicator').innerHTML = `<span class="text-amber-400"><i class="fa-solid fa-circle-exclamation mr-1"></i> Not captured</span>`;
+
+    // Reset remote status banner if visible
+    const banner = document.getElementById('remote-status-banner');
+    if (banner) banner.classList.add('hidden');
+
+    // Generate fresh auto roll number
+    generateAutoRollNumber();
 
     // Refresh facial descriptors in matcher
     await reloadRegisteredFaces();
@@ -588,15 +885,84 @@ async function handleRegistration(e) {
     alert("Error: " + err.message);
   } finally {
     submitBtn.disabled = false;
-    submitBtn.innerText = "Complete Student Registration";
+    submitBtn.innerText = "SAVE & REGISTER STUDENT (SENDS WHATSAPP WELCOME)";
   }
 }
 
-// 7. Load Attendance Logs
+// 7. Admin Mode: Registered Students Directory
+async function loadAdminStudents() {
+  const container = document.getElementById('admin-students-list');
+  if (!container) return;
+  container.innerHTML = `<div class="text-center py-6 text-xs text-slate-500"><i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Loading student directory...</div>`;
+
+  try {
+    const res = await fetch(`${getApiBaseUrl()}/api/students/list`);
+    const students = await res.json();
+
+    const countEl = document.getElementById('admin-students-count');
+    if (countEl) countEl.innerText = students.length;
+
+    if (students.length === 0) {
+      container.innerHTML = `<div class="text-center py-8 text-xs text-slate-500">No students registered yet. Register a student to view them here.</div>`;
+      return;
+    }
+
+    container.innerHTML = students.map(st => `
+      <div class="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800/80 flex items-center justify-between hover:border-slate-700 transition">
+        <div class="flex items-center space-x-3">
+          <div class="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-black">
+            ${st.name.charAt(0)}
+          </div>
+          <div>
+            <h4 class="text-xs md:text-sm font-extrabold text-white leading-tight">${st.name}</h4>
+            <div class="flex items-center space-x-2 text-[10px] text-slate-400 font-mono mt-0.5">
+              <span class="text-emerald-400 font-bold">${st.roll_no}</span>
+              <span>•</span>
+              <span>${st.batch || 'General'}</span>
+              <span>•</span>
+              <span><i class="fa-brands fa-whatsapp text-emerald-400"></i> ${st.parent_phone}</span>
+            </div>
+          </div>
+        </div>
+
+        <button onclick="deleteStudent(${st.id}, '${st.name.replace(/'/g, "\\'")}')" class="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 text-xs font-bold transition flex items-center space-x-1.5">
+          <i class="fa-solid fa-trash-can text-xs"></i>
+          <span class="hidden sm:inline">Delete</span>
+        </button>
+      </div>
+    `).join('');
+  } catch (err) {
+    container.innerHTML = `<div class="text-center py-6 text-xs text-rose-400">Failed to load student directory.</div>`;
+  }
+}
+
+// Delete student
+async function deleteStudent(studentId, name) {
+  if (!confirm(`Are you sure you want to remove student "${name}"? This will delete their face profile.`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`${getApiBaseUrl()}/api/students/${studentId}`, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    if (data.success) {
+      await reloadRegisteredFaces();
+      loadAdminStudents();
+    } else {
+      alert("Failed to delete student: " + (data.error || "Unknown error"));
+    }
+  } catch (err) {
+    alert("Error deleting student: " + err.message);
+  }
+}
+
+// 8. Load Attendance Logs
 async function loadAttendanceLogs() {
   const container = document.getElementById('logs-list-container');
   if (!container) return;
-  container.innerHTML = `<div class="text-center py-6 text-xs text-slate-500"><i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Loading...</div>`;
+  container.innerHTML = `<div class="text-center py-6 text-xs text-slate-500"><i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Loading attendance logs...</div>`;
 
   try {
     const res = await fetch(`${getApiBaseUrl()}/api/attendance/logs`);
@@ -609,6 +975,7 @@ async function loadAttendanceLogs() {
 
     container.innerHTML = logs.map(row => {
       const isSuccess = row.whatsapp_status === 'SENT' || row.whatsapp_status === 'SIMULATED';
+      const isExit = row.type === 'EXIT';
       const badgeStyle = isSuccess 
         ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
         : 'bg-rose-500/10 text-rose-400 border border-rose-500/20';
@@ -618,11 +985,16 @@ async function loadAttendanceLogs() {
       return `
         <div class="p-3 rounded-2xl bg-slate-900/80 border border-slate-800/80 flex items-center justify-between">
           <div class="flex items-center space-x-3">
-            <div class="w-8 h-8 rounded-xl bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-300">
+            <div class="w-8 h-8 rounded-xl ${isExit ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'} flex items-center justify-center text-xs font-bold">
               ${row.student_name.charAt(0)}
             </div>
             <div>
-              <h4 class="text-xs font-bold text-white leading-tight">${row.student_name}</h4>
+              <div class="flex items-center space-x-2">
+                <h4 class="text-xs font-bold text-white leading-tight">${row.student_name}</h4>
+                <span class="px-1.5 py-0.5 rounded text-[9px] font-black ${isExit ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}">
+                  ${isExit ? 'EXIT' : 'ENTRY'}
+                </span>
+              </div>
               <p class="text-[10px] text-slate-400 font-mono mt-0.5">Roll: ${row.roll_no} • ${row.parent_phone}</p>
             </div>
           </div>
@@ -640,7 +1012,7 @@ async function loadAttendanceLogs() {
   }
 }
 
-// 8. Check WhatsApp Service Status
+// 9. Check WhatsApp Service Status
 let qrPollingInterval = null;
 
 async function checkWhatsAppStatus() {
@@ -694,7 +1066,6 @@ async function fetchAndDisplayQR() {
     if (data && data.qrCode) {
       document.getElementById('qr-image').src = data.qrCode;
     }
-    // Also check status in parallel
     checkWhatsAppStatus();
   } catch (err) {
     console.error("Failed to fetch QR code:", err);
