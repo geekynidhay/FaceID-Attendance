@@ -1,16 +1,16 @@
 {
   "name": "attendance-app",
   "version": "1.0.0",
-  "description": "",
+  "description": "DOT-CMC Attendance Kiosk & Verification System",
   "main": "electron-main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
     "electron": "electron .",
-    "dist:win": "electron-builder --win nsis --x64"
+    "dist:win": "electron-builder --win nsis --x64 -c.publish=never"
   },
   "keywords": [],
-  "author": "",
+  "author": "DOT-CMC",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
@@ -47,6 +47,12 @@
     "files": [
       "**/*",
       "!attendance.db-journal"
-    ]
+    ],
+    "publish": null,
+    "npmRebuild": false
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/geekynidhay/FaceID-Attendance.git"
   }
 }
