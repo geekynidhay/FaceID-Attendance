@@ -7,7 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
     "electron": "electron .",
-    "dist:win": "electron-builder --win nsis --x64 -c.publish=never"
+    "dist:win": "electron-builder --win nsis --x64 --publish never"
   },
   "keywords": [],
   "author": "DOT-CMC",
@@ -49,7 +49,6 @@
       "**/*",
       "!attendance.db-journal"
     ],
-    "publish": null,
     "npmRebuild": false,
     "asarUnpack": [
       "**/node_modules/sqlite3/**/*"
