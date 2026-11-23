@@ -35,7 +35,8 @@
     },
     "win": {
       "target": "nsis",
-      "icon": "public/icon.png"
+      "icon": "public/icon.png",
+      "verifyUpdateCodeSignature": false
     },
     "nsis": {
       "oneClick": false,
@@ -49,7 +50,10 @@
       "!attendance.db-journal"
     ],
     "publish": null,
-    "npmRebuild": false
+    "npmRebuild": false,
+    "asarUnpack": [
+      "**/node_modules/sqlite3/**/*"
+    ]
   },
   "repository": {
     "type": "git",
