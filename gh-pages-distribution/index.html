@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>DOT-CMC</title>
-  
+
   <!-- PWA Manifest & Meta -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#030712">
@@ -28,7 +30,7 @@
       user-select: none;
       -webkit-user-select: none;
     }
-    
+
     .glass-card {
       background: rgba(15, 23, 42, 0.75);
       backdrop-filter: blur(16px);
@@ -45,6 +47,7 @@
     .no-scrollbar::-webkit-scrollbar {
       display: none;
     }
+
     .no-scrollbar {
       -ms-overflow-style: none;
       scrollbar-width: none;
@@ -54,15 +57,17 @@
   <!-- Face-API.js -->
   <script defer src="face-api.min.js"></script>
 </head>
+
 <body class="min-h-screen flex flex-col justify-between selection:bg-emerald-500 selection:text-white">
 
   <!-- ================= TOP HEADER BAR ================= -->
   <header class="glass-header sticky top-0 z-40 border-b border-slate-800/80 px-4 py-3 md:px-8">
     <div class="max-w-7xl mx-auto flex items-center justify-between">
-      
+
       <!-- Brand & Staff Identifier -->
       <div class="flex items-center space-x-3">
-        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 p-[1.5px] flex items-center justify-center shadow-lg shadow-emerald-500/20">
+        <div
+          class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 p-[1.5px] flex items-center justify-center shadow-lg shadow-emerald-500/20">
           <div class="w-full h-full bg-slate-950 rounded-2xl flex items-center justify-center">
             <i class="fa-solid fa-graduation-cap text-emerald-400 text-lg"></i>
           </div>
@@ -73,12 +78,14 @@
           </h1>
           <div class="flex items-center space-x-2 mt-0.5">
             <!-- Staff Name Pill (Click to rename) -->
-            <button onclick="promptChangeStaffName()" title="Click to rename staff" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 hover:border-indigo-400 transition">
+            <button onclick="promptChangeStaffName()" title="Click to rename staff"
+              class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 hover:border-indigo-400 transition">
               <i class="fa-solid fa-user-tag mr-1 text-[9px] text-indigo-400"></i>
               <span id="device-name-display">Staff</span>
             </button>
             <!-- WhatsApp Status Pill (Web only - hidden on staff phone app) -->
-            <button id="wa-pill" onclick="handleWhatsAppPillClick()" class="hidden md:inline-flex cursor-pointer items-center space-x-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:border-emerald-400 transition text-[10px] font-bold">
+            <button id="wa-pill" onclick="handleWhatsAppPillClick()"
+              class="hidden md:inline-flex cursor-pointer items-center space-x-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:border-emerald-400 transition text-[10px] font-bold">
               <i class="fa-brands fa-whatsapp text-xs"></i>
               <span id="wa-status-text">WhatsApp Login</span>
             </button>
@@ -88,13 +95,16 @@
 
       <!-- Desktop Navigation Tabs -->
       <div class="hidden md:flex items-center space-x-2 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800">
-        <button id="web-nav-scan-btn" onclick="switchTab('scan')" class="px-5 py-2 rounded-xl text-xs font-bold transition bg-emerald-600 text-white shadow-md shadow-emerald-600/30">
+        <button id="web-nav-scan-btn" onclick="switchTab('scan')"
+          class="px-5 py-2 rounded-xl text-xs font-bold transition bg-emerald-600 text-white shadow-md shadow-emerald-600/30">
           <i class="fa-solid fa-camera mr-2"></i> Scanner
         </button>
-        <button id="web-nav-register-btn" onclick="switchTab('register')" class="px-5 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition">
+        <button id="web-nav-register-btn" onclick="switchTab('register')"
+          class="px-5 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition">
           <i class="fa-solid fa-user-plus mr-2"></i> Register Student
         </button>
-        <button id="web-nav-logs-btn" onclick="switchTab('logs')" class="px-5 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition">
+        <button id="web-nav-logs-btn" onclick="switchTab('logs')"
+          class="px-5 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition">
           <i class="fa-solid fa-user-shield mr-2"></i> Admin Mode
         </button>
       </div>
@@ -102,14 +112,17 @@
       <!-- Quick Action Controls -->
       <div class="flex items-center space-x-2">
         <!-- WhatsApp Connect Button (Visible on Web PC only) -->
-        <button id="web-wa-action-btn" onclick="showQRCodeModal()" title="Link WhatsApp" class="hidden md:flex items-center space-x-1.5 py-2 px-3 rounded-xl bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-600 hover:text-white transition text-xs font-bold shadow">
+        <button id="web-wa-action-btn" onclick="showQRCodeModal()" title="Link WhatsApp"
+          class="hidden md:flex items-center space-x-1.5 py-2 px-3 rounded-xl bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-600 hover:text-white transition text-xs font-bold shadow">
           <i class="fa-brands fa-whatsapp text-sm text-emerald-400"></i>
           <span>WhatsApp QR</span>
         </button>
-        <button onclick="toggleCameraMirror()" title="Flip Front / Back Camera" class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition">
+        <button onclick="toggleCameraMirror()" title="Flip Front / Back Camera"
+          class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition">
           <i class="fa-solid fa-camera-rotate text-sm"></i>
         </button>
-        <button onclick="openServerConfigModal()" title="Server Link" class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition">
+        <button onclick="openServerConfigModal()" title="Server Link"
+          class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition">
           <i class="fa-solid fa-gear text-sm"></i>
         </button>
       </div>
@@ -121,7 +134,8 @@
   <main class="flex-1 w-full max-w-7xl mx-auto p-3 md:p-6 flex flex-col justify-start">
 
     <!-- Model Loading Banner -->
-    <div id="model-loader" class="w-full glass-card rounded-2xl p-4 mb-4 border border-emerald-500/30 flex items-center justify-between text-xs text-emerald-300 animate-pulse">
+    <div id="model-loader"
+      class="w-full glass-card rounded-2xl p-4 mb-4 border border-emerald-500/30 flex items-center justify-between text-xs text-emerald-300 animate-pulse">
       <div class="flex items-center space-x-3">
         <i class="fa-solid fa-brain text-emerald-400 text-base"></i>
         <span id="loader-status">Initializing face recognition neural weights...</span>
@@ -133,13 +147,15 @@
     <section id="tab-scan" class="w-full flex flex-col items-center space-y-4">
 
       <!-- CAMERA STREAM VIEWFINDER (CLEAN, NO LASER ANIMATION, NO BOXES) -->
-      <div class="relative w-full max-w-lg aspect-[4/3] rounded-3xl overflow-hidden glass-card border border-slate-800 shadow-2xl bg-slate-950 flex items-center justify-center">
+      <div
+        class="relative w-full max-w-lg aspect-[4/3] rounded-3xl overflow-hidden glass-card border border-slate-800 shadow-2xl bg-slate-950 flex items-center justify-center">
         <!-- Video Element -->
         <video id="video-stream" autoplay muted playsinline class="w-full h-full object-cover"></video>
-        
+
         <!-- Subtle Status Prompt Floating on Bottom Edge of Camera -->
         <div class="absolute bottom-3 inset-x-4 pointer-events-none">
-          <div class="glass-card rounded-2xl py-2 px-3 text-center border border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
+          <div
+            class="glass-card rounded-2xl py-2 px-3 text-center border border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
             <span id="scanner-status-text" class="text-xs font-semibold text-slate-200">
               Ready • Look at camera and tap Scan
             </span>
@@ -149,12 +165,14 @@
 
       <!-- BOTTOM SCANNER CONTROLS (ONLY SCAN FACE AND AUTO) -->
       <div class="w-full max-w-lg grid grid-cols-2 gap-3 pt-1">
-        <button id="btn-manual-scan" onclick="triggerManualScan()" class="py-3.5 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 text-white font-extrabold rounded-2xl text-xs md:text-sm shadow-xl shadow-emerald-500/25 active:scale-95 transition flex items-center justify-center space-x-2">
+        <button id="btn-manual-scan" onclick="triggerManualScan()"
+          class="py-3.5 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 text-white font-extrabold rounded-2xl text-xs md:text-sm shadow-xl shadow-emerald-500/25 active:scale-95 transition flex items-center justify-center space-x-2">
           <i class="fa-solid fa-expand text-base"></i>
           <span>Scan Face (Enter)</span>
         </button>
 
-        <button id="btn-toggle-continuous" onclick="toggleContinuousScan()" class="py-3.5 px-4 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 font-bold rounded-2xl text-xs md:text-sm active:scale-95 transition flex items-center justify-center space-x-2">
+        <button id="btn-toggle-continuous" onclick="toggleContinuousScan()"
+          class="py-3.5 px-4 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 font-bold rounded-2xl text-xs md:text-sm active:scale-95 transition flex items-center justify-center space-x-2">
           <i class="fa-solid fa-bolt text-amber-400"></i>
           <span>Auto: <span id="auto-scan-status" class="text-rose-400 font-bold">OFF</span></span>
         </button>
@@ -172,33 +190,38 @@
             </h2>
             <p class="text-xs text-slate-400 mt-0.5">Captures face & sends bilingual welcome message to parents</p>
           </div>
-          <button type="button" onclick="generateAutoRollNumber()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-semibold text-emerald-400 flex items-center transition">
+          <button type="button" onclick="generateAutoRollNumber()"
+            class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-semibold text-emerald-400 flex items-center transition">
             <i class="fa-solid fa-arrows-rotate mr-1.5"></i> Reroll ID
           </button>
         </div>
 
         <form id="register-form" onsubmit="handleRegistration(event)" class="space-y-5">
-          
+
           <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
             <!-- Inputs -->
             <div class="space-y-4">
               <!-- Student Name -->
               <div>
-                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Student Full Name *</label>
-                <input type="text" id="reg-name" required 
-                       class="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-4 py-3 text-xs md:text-sm text-white focus:outline-none focus:border-emerald-500">
+                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Student Full Name
+                  *</label>
+                <input type="text" id="reg-name" required
+                  class="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-4 py-3 text-xs md:text-sm text-white focus:outline-none focus:border-emerald-500">
               </div>
 
               <!-- Roll No & Batch Dropdown -->
               <div class="grid grid-cols-2 gap-3">
                 <div>
-                  <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Roll / ID (Auto)</label>
-                  <input type="text" id="reg-roll" readonly required 
-                         class="w-full bg-slate-900/80 border border-slate-700/80 rounded-xl px-4 py-3 text-xs md:text-sm text-emerald-400 font-mono font-bold select-none cursor-not-allowed">
+                  <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Roll / ID
+                    (Auto)</label>
+                  <input type="text" id="reg-roll" readonly required
+                    class="w-full bg-slate-900/80 border border-slate-700/80 rounded-xl px-4 py-3 text-xs md:text-sm text-emerald-400 font-mono font-bold select-none cursor-not-allowed">
                 </div>
                 <div>
-                  <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Batch / Class</label>
-                  <select id="reg-batch" class="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-4 py-3 text-xs md:text-sm text-white focus:outline-none focus:border-emerald-500">
+                  <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Batch /
+                    Class</label>
+                  <select id="reg-batch"
+                    class="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-4 py-3 text-xs md:text-sm text-white focus:outline-none focus:border-emerald-500">
                     <option value="Basic Computer">Basic Computer</option>
                   </select>
                 </div>
@@ -207,48 +230,56 @@
               <!-- Father's & Mother's Name (Optional) -->
               <div class="grid grid-cols-2 gap-3">
                 <div>
-                  <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Father's Name <span class="text-slate-500 font-normal lowercase">(optional)</span></label>
-                  <input type="text" id="reg-father" 
-                         class="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-4 py-3 text-xs md:text-sm text-white focus:outline-none focus:border-emerald-500">
+                  <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Father's Name
+                    <span class="text-slate-500 font-normal lowercase">(optional)</span></label>
+                  <input type="text" id="reg-father"
+                    class="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-4 py-3 text-xs md:text-sm text-white focus:outline-none focus:border-emerald-500">
                 </div>
                 <div>
-                  <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Mother's Name <span class="text-slate-500 font-normal lowercase">(optional)</span></label>
-                  <input type="text" id="reg-mother" 
-                         class="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-4 py-3 text-xs md:text-sm text-white focus:outline-none focus:border-emerald-500">
+                  <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Mother's Name
+                    <span class="text-slate-500 font-normal lowercase">(optional)</span></label>
+                  <input type="text" id="reg-mother"
+                    class="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-4 py-3 text-xs md:text-sm text-white focus:outline-none focus:border-emerald-500">
                 </div>
               </div>
 
               <!-- Primary WhatsApp Phone -->
               <div>
                 <div class="flex items-center justify-between mb-1">
-                  <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">Parent WhatsApp Number *</label>
-                  <button type="button" id="btn-toggle-secondary-phone" onclick="toggleSecondaryPhoneField()" class="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition flex items-center">
+                  <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">Parent WhatsApp Number
+                    *</label>
+                  <button type="button" id="btn-toggle-secondary-phone" onclick="toggleSecondaryPhoneField()"
+                    class="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition flex items-center">
                     <i class="fa-solid fa-plus-circle mr-1"></i> Add 2nd Number
                   </button>
                 </div>
                 <div class="relative flex items-center">
-                  <span class="inline-flex items-center px-4 py-3 rounded-l-xl border border-r-0 border-slate-700/80 bg-slate-900 text-emerald-400 font-bold text-xs md:text-sm">
+                  <span
+                    class="inline-flex items-center px-4 py-3 rounded-l-xl border border-r-0 border-slate-700/80 bg-slate-900 text-emerald-400 font-bold text-xs md:text-sm">
                     <i class="fa-brands fa-whatsapp mr-1.5 text-base"></i> +91
                   </span>
-                  <input type="tel" id="reg-parent-phone" required maxlength="10" 
-                         class="w-full bg-slate-950 border border-slate-700/80 rounded-r-xl px-4 py-3 text-xs md:text-sm text-white font-mono focus:outline-none focus:border-emerald-500">
+                  <input type="tel" id="reg-parent-phone" required maxlength="10"
+                    class="w-full bg-slate-950 border border-slate-700/80 rounded-r-xl px-4 py-3 text-xs md:text-sm text-white font-mono focus:outline-none focus:border-emerald-500">
                 </div>
               </div>
 
               <!-- Secondary WhatsApp Phone (Optional) -->
               <div id="secondary-phone-container" class="hidden space-y-1">
                 <div class="flex items-center justify-between">
-                  <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">Secondary WhatsApp Number <span class="text-slate-500 font-normal lowercase">(both get notified)</span></label>
-                  <button type="button" onclick="toggleSecondaryPhoneField()" class="text-xs text-rose-400 hover:text-rose-300">
+                  <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">Secondary WhatsApp
+                    Number <span class="text-slate-500 font-normal lowercase">(both get notified)</span></label>
+                  <button type="button" onclick="toggleSecondaryPhoneField()"
+                    class="text-xs text-rose-400 hover:text-rose-300">
                     <i class="fa-solid fa-xmark mr-0.5"></i> Remove
                   </button>
                 </div>
                 <div class="relative flex items-center">
-                  <span class="inline-flex items-center px-4 py-3 rounded-l-xl border border-r-0 border-slate-700/80 bg-slate-900 text-teal-400 font-bold text-xs md:text-sm">
+                  <span
+                    class="inline-flex items-center px-4 py-3 rounded-l-xl border border-r-0 border-slate-700/80 bg-slate-900 text-teal-400 font-bold text-xs md:text-sm">
                     <i class="fa-brands fa-whatsapp mr-1.5 text-base"></i> +91
                   </span>
-                  <input type="tel" id="reg-secondary-phone" maxlength="10" 
-                         class="w-full bg-slate-950 border border-slate-700/80 rounded-r-xl px-4 py-3 text-xs md:text-sm text-white font-mono focus:outline-none focus:border-emerald-500">
+                  <input type="tel" id="reg-secondary-phone" maxlength="10"
+                    class="w-full bg-slate-950 border border-slate-700/80 rounded-r-xl px-4 py-3 text-xs md:text-sm text-white font-mono focus:outline-none focus:border-emerald-500">
                 </div>
               </div>
 
@@ -259,20 +290,25 @@
               <div class="flex items-center justify-between">
                 <label class="text-xs font-bold text-slate-300 uppercase tracking-wider">Face Feature Capture *</label>
                 <!-- Switch Between This PC & Staff Phone (Hidden on phone apps) -->
-                <div id="remote-capture-toggle-group" class="flex items-center space-x-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-[11px]">
-                  <button type="button" id="btn-mode-local" onclick="setCaptureMode('local')" class="px-2.5 py-1 rounded-lg font-bold bg-emerald-600 text-white">This PC</button>
-                  <button type="button" id="btn-mode-remote" onclick="setCaptureMode('remote')" class="px-2.5 py-1 rounded-lg font-semibold text-slate-400 hover:text-white">Staff Phone</button>
+                <div id="remote-capture-toggle-group"
+                  class="flex items-center space-x-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-[11px]">
+                  <button type="button" id="btn-mode-local" onclick="setCaptureMode('local')"
+                    class="px-2.5 py-1 rounded-lg font-bold bg-emerald-600 text-white">This PC</button>
+                  <button type="button" id="btn-mode-remote" onclick="setCaptureMode('remote')"
+                    class="px-2.5 py-1 rounded-lg font-semibold text-slate-400 hover:text-white">Staff Phone</button>
                 </div>
               </div>
 
               <!-- Local Camera View -->
               <div id="local-capture-container">
-                <div class="relative w-full aspect-video rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center">
+                <div
+                  class="relative w-full aspect-video rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center">
                   <video id="reg-video" autoplay muted playsinline class="w-full h-full object-cover"></video>
                 </div>
 
                 <div class="flex items-center justify-between pt-2">
-                  <button type="button" onclick="captureFaceForRegistration()" class="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold text-white flex items-center space-x-2 transition shadow">
+                  <button type="button" onclick="captureFaceForRegistration()"
+                    class="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold text-white flex items-center space-x-2 transition shadow">
                     <i class="fa-solid fa-camera"></i>
                     <span>Capture Face</span>
                   </button>
@@ -283,18 +319,23 @@
               </div>
 
               <!-- Remote Staff Phone Selector (For Computer without webcam) -->
-              <div id="remote-capture-container" class="hidden p-4 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-3 text-center">
-                <div class="w-12 h-12 mx-auto rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xl">
+              <div id="remote-capture-container"
+                class="hidden p-4 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-3 text-center">
+                <div
+                  class="w-12 h-12 mx-auto rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xl">
                   <i class="fa-solid fa-mobile-screen"></i>
                 </div>
                 <h4 class="text-xs font-bold text-white">Capture Face from Staff Phone</h4>
-                <p class="text-[11px] text-slate-400">Select an online phone. A popup will trigger on that phone to snap the photo.</p>
-                
-                <select id="select-remote-device" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none">
+                <p class="text-[11px] text-slate-400">Select an online phone. A popup will trigger on that phone to snap
+                  the photo.</p>
+
+                <select id="select-remote-device"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none">
                   <option value="">Searching for online staff phones...</option>
                 </select>
 
-                <button type="button" id="btn-send-remote-req" onclick="dispatchRemoteCaptureRequest()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-bold text-white transition flex items-center justify-center space-x-2">
+                <button type="button" id="btn-send-remote-req" onclick="dispatchRemoteCaptureRequest()"
+                  class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-bold text-white transition flex items-center justify-center space-x-2">
                   <i class="fa-solid fa-paper-plane"></i>
                   <span>Send Snap Request to Phone</span>
                 </button>
@@ -308,8 +349,9 @@
           </div>
 
           <div class="pt-3 border-t border-slate-800">
-            <button type="submit" id="btn-submit-reg" class="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 text-white font-extrabold rounded-2xl text-xs md:text-sm shadow-xl shadow-emerald-500/25 transition">
-              SAVE & REGISTER STUDENT (SENDS WHATSAPP WELCOME)
+            <button type="submit" id="btn-submit-reg"
+              class="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 text-white font-extrabold rounded-2xl text-xs md:text-sm shadow-xl shadow-emerald-500/25 transition">
+              SAVE & REGISTER STUDENT
             </button>
           </div>
         </form>
@@ -318,7 +360,7 @@
 
     <!-- 3. ADMIN MODE (STUDENTS MANAGEMENT + BATCHES + EXPORT TO EXCEL) -->
     <section id="tab-logs" class="hidden w-full max-w-5xl mx-auto space-y-5">
-      
+
       <!-- Admin Top Card: Summary & Sub-Tabs & Export -->
       <div class="glass-card rounded-3xl p-5 md:p-6 border border-slate-800 shadow-2xl space-y-4">
         <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
@@ -326,12 +368,14 @@
             <h2 class="text-base md:text-lg font-extrabold text-white flex items-center">
               <i class="fa-solid fa-user-shield text-emerald-400 mr-2.5"></i> Admin Control Panel
             </h2>
-            <p class="text-xs text-slate-400 mt-0.5">Manage & edit students, manage batches, audit attendance, or export to Excel</p>
+            <p class="text-xs text-slate-400 mt-0.5">Manage & edit students, manage batches, audit attendance, or export
+              to Excel</p>
           </div>
 
           <!-- Quick Action: Export to Excel Button -->
           <div class="flex items-center space-x-2">
-            <button onclick="exportStudentsToExcel()" class="px-3.5 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 text-xs font-bold transition flex items-center space-x-1.5 shadow">
+            <button onclick="exportStudentsToExcel()"
+              class="px-3.5 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 text-xs font-bold transition flex items-center space-x-1.5 shadow">
               <i class="fa-solid fa-file-excel text-emerald-400"></i>
               <span>Export to Excel</span>
             </button>
@@ -340,23 +384,27 @@
 
         <!-- Sub-mode switch tabs -->
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <div class="flex items-center space-x-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-bold">
-            <button onclick="switchAdminSubTab('students')" id="admin-sub-students" class="px-3.5 py-1.5 rounded-lg bg-emerald-600 text-white transition">
+          <div
+            class="flex items-center space-x-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-bold">
+            <button onclick="switchAdminSubTab('students')" id="admin-sub-students"
+              class="px-3.5 py-1.5 rounded-lg bg-emerald-600 text-white transition">
               <i class="fa-solid fa-users mr-1.5"></i> Students (<span id="admin-students-count">0</span>)
             </button>
-            <button onclick="switchAdminSubTab('batches')" id="admin-sub-batches" class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white transition">
+            <button onclick="switchAdminSubTab('batches')" id="admin-sub-batches"
+              class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white transition">
               <i class="fa-solid fa-layer-group mr-1.5"></i> Batches
             </button>
-            <button onclick="switchAdminSubTab('logs')" id="admin-sub-logs" class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white transition">
+            <button onclick="switchAdminSubTab('logs')" id="admin-sub-logs"
+              class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white transition">
               <i class="fa-solid fa-list-check mr-1.5"></i> Logs
             </button>
           </div>
 
           <div id="admin-search-container" class="relative">
             <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-500"></i>
-            <input type="text" id="admin-student-search" oninput="filterAdminStudents()" 
-                   placeholder="Search student or roll..." 
-                   class="bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 w-48 sm:w-64">
+            <input type="text" id="admin-student-search" oninput="filterAdminStudents()"
+              placeholder="Search student or roll..."
+              class="bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 w-48 sm:w-64">
           </div>
         </div>
 
@@ -372,10 +420,10 @@
           <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
             <h3 class="text-xs font-bold text-white uppercase tracking-wider">Add New Batch / Course</h3>
             <div class="flex items-center space-x-2">
-              <input type="text" id="new-batch-name" 
-                     placeholder="Batch name (e.g. DCA / PGDCA / Java)" 
-                     class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500">
-              <button onclick="addNewBatch()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5">
+              <input type="text" id="new-batch-name" placeholder="Batch name (e.g. DCA / PGDCA / Java)"
+                class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+              <button onclick="addNewBatch()"
+                class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5">
                 <i class="fa-solid fa-plus"></i>
                 <span>Add Batch</span>
               </button>
@@ -405,17 +453,20 @@
   <!-- ================= MOBILE BOTTOM NAVIGATION DOCK ================= -->
   <nav class="md:hidden glass-header px-6 py-2.5 border-t border-slate-800/80 sticky bottom-0 z-40">
     <div class="max-w-md mx-auto grid grid-cols-3 gap-2">
-      <button id="nav-scan-btn" onclick="switchTab('scan')" class="py-2 rounded-2xl flex flex-col items-center justify-center text-emerald-400 font-bold transition">
+      <button id="nav-scan-btn" onclick="switchTab('scan')"
+        class="py-2 rounded-2xl flex flex-col items-center justify-center text-emerald-400 font-bold transition">
         <i class="fa-solid fa-camera text-base"></i>
         <span class="text-[10px] tracking-wide mt-1">SCANNER</span>
       </button>
 
-      <button id="nav-register-btn" onclick="switchTab('register')" class="py-2 rounded-2xl flex flex-col items-center justify-center text-slate-400 transition">
+      <button id="nav-register-btn" onclick="switchTab('register')"
+        class="py-2 rounded-2xl flex flex-col items-center justify-center text-slate-400 transition">
         <i class="fa-solid fa-user-plus text-base"></i>
         <span class="text-[10px] tracking-wide mt-1">REGISTER</span>
       </button>
 
-      <button id="nav-logs-btn" onclick="switchTab('logs')" class="py-2 rounded-2xl flex flex-col items-center justify-center text-slate-400 transition">
+      <button id="nav-logs-btn" onclick="switchTab('logs')"
+        class="py-2 rounded-2xl flex flex-col items-center justify-center text-slate-400 transition">
         <i class="fa-solid fa-user-shield text-base"></i>
         <span class="text-[10px] tracking-wide mt-1">ADMIN</span>
       </button>
@@ -425,9 +476,11 @@
   <!-- ================= MODALS ================= -->
 
   <!-- Staff Name Prompt Modal (Clean in-app modal instead of browser prompt) -->
-  <div id="staff-name-modal" class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
+  <div id="staff-name-modal"
+    class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
     <div class="glass-card border border-slate-700/80 rounded-3xl max-w-xs w-full p-6 text-center space-y-4 shadow-2xl">
-      <div class="w-12 h-12 mx-auto rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xl">
+      <div
+        class="w-12 h-12 mx-auto rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xl">
         <i class="fa-solid fa-user-tag"></i>
       </div>
       <div>
@@ -435,14 +488,16 @@
         <p class="text-xs text-slate-400 mt-1">Enter your name for attendance tracking:</p>
       </div>
 
-      <input type="text" id="staff-name-input" placeholder="e.g. Nidhay Rathore" 
-             class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 text-center font-bold">
+      <input type="text" id="staff-name-input" placeholder="e.g. Nidhay Rathore"
+        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 text-center font-bold">
 
       <div class="grid grid-cols-2 gap-2 pt-1">
-        <button onclick="saveStaffName()" class="py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-extrabold rounded-xl text-xs transition">
+        <button onclick="saveStaffName()"
+          class="py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-extrabold rounded-xl text-xs transition">
           SAVE
         </button>
-        <button onclick="closeStaffNameModal()" class="py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 font-bold rounded-xl text-xs transition">
+        <button onclick="closeStaffNameModal()"
+          class="py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 font-bold rounded-xl text-xs transition">
           SKIP
         </button>
       </div>
@@ -450,7 +505,8 @@
   </div>
 
   <!-- 1. Edit Student Modal -->
-  <div id="edit-student-modal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
+  <div id="edit-student-modal"
+    class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
     <div class="glass-card border border-slate-700/80 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <h3 class="text-sm md:text-base font-extrabold text-white flex items-center">
@@ -466,19 +522,20 @@
 
         <div>
           <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">Student Full Name *</label>
-          <input type="text" id="edit-student-name" required 
-                 class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+          <input type="text" id="edit-student-name" required
+            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
         </div>
 
         <div class="grid grid-cols-2 gap-2.5">
           <div>
             <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">Roll / ID</label>
-            <input type="text" id="edit-student-roll" readonly 
-                   class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-emerald-400 font-mono font-bold cursor-not-allowed">
+            <input type="text" id="edit-student-roll" readonly
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-emerald-400 font-mono font-bold cursor-not-allowed">
           </div>
           <div>
             <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">Batch / Class</label>
-            <select id="edit-student-batch" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+            <select id="edit-student-batch"
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
             </select>
           </div>
         </div>
@@ -486,33 +543,36 @@
         <div class="grid grid-cols-2 gap-2.5">
           <div>
             <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">Father's Name</label>
-            <input type="text" id="edit-student-father" 
-                   class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+            <input type="text" id="edit-student-father"
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
           </div>
           <div>
             <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">Mother's Name</label>
-            <input type="text" id="edit-student-mother" 
-                   class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+            <input type="text" id="edit-student-mother"
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
           </div>
         </div>
 
         <div>
           <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">Parent WhatsApp Number *</label>
-          <input type="tel" id="edit-student-phone" required maxlength="10" 
-                 class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500">
+          <input type="tel" id="edit-student-phone" required maxlength="10"
+            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500">
         </div>
 
         <div>
-          <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">Secondary WhatsApp Number (Optional)</label>
-          <input type="tel" id="edit-student-sec-phone" maxlength="10" 
-                 class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500">
+          <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">Secondary WhatsApp Number
+            (Optional)</label>
+          <input type="tel" id="edit-student-sec-phone" maxlength="10"
+            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500">
         </div>
 
         <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800">
-          <button type="submit" id="btn-save-edit" class="py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition">
+          <button type="submit" id="btn-save-edit"
+            class="py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition">
             Save Changes
           </button>
-          <button type="button" onclick="closeEditStudentModal()" class="py-2.5 bg-slate-800 text-slate-300 font-medium rounded-xl text-xs hover:bg-slate-700 transition">
+          <button type="button" onclick="closeEditStudentModal()"
+            class="py-2.5 bg-slate-800 text-slate-300 font-medium rounded-xl text-xs hover:bg-slate-700 transition">
             Cancel
           </button>
         </div>
@@ -521,26 +581,37 @@
   </div>
 
   <!-- 2. Remote Camera Capture Triggered on Staff Phone Modal -->
-  <div id="incoming-snap-modal" class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
-    <div class="glass-card border border-indigo-500/50 rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl text-center">
-      <div class="w-12 h-12 mx-auto rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xl">
+  <div id="incoming-snap-modal"
+    class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
+    <div
+      class="glass-card border border-indigo-500/50 rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl text-center">
+      <div
+        class="w-12 h-12 mx-auto rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xl">
         <i class="fa-solid fa-camera"></i>
       </div>
       <div>
         <h3 class="text-base font-extrabold text-white">Photo Request from PC</h3>
-        <p class="text-xs text-indigo-300 font-semibold mt-0.5">Student: <span id="snap-target-name">Rahul Sharma</span></p>
+        <p class="text-xs text-indigo-300 font-semibold mt-0.5">Student: <span id="snap-target-name">Rahul Sharma</span>
+        </p>
         <p class="text-[11px] text-slate-400 mt-1">Position student's face and tap capture to sync to PC.</p>
       </div>
 
-      <div class="relative w-full aspect-video rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center">
+      <div
+        class="relative w-full aspect-video rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center">
         <video id="snap-phone-video" autoplay muted playsinline class="w-full h-full object-cover"></video>
+        <!-- Camera switch flip button -->
+        <button type="button" onclick="toggleSnapCameraFacing()" class="absolute top-2 right-2 p-2 rounded-xl bg-slate-900/80 backdrop-blur-md text-white border border-slate-700/60 shadow-lg active:scale-95 transition">
+          <i class="fa-solid fa-camera-rotate text-sm"></i>
+        </button>
       </div>
 
       <div class="grid grid-cols-2 gap-2 pt-1">
-        <button onclick="submitRemoteSnap()" id="btn-snap-submit" class="py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-extrabold rounded-xl text-xs shadow-lg shadow-indigo-600/30 transition">
+        <button onclick="submitRemoteSnap()" id="btn-snap-submit"
+          class="py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-extrabold rounded-xl text-xs shadow-lg shadow-indigo-600/30 transition">
           SNAP & SEND
         </button>
-        <button onclick="dismissRemoteSnap()" class="py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 font-bold rounded-xl text-xs transition">
+        <button onclick="dismissRemoteSnap()"
+          class="py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 font-bold rounded-xl text-xs transition">
           DISMISS
         </button>
       </div>
@@ -548,9 +619,11 @@
   </div>
 
   <!-- 3. Student Leaving Confirmation Modal -->
-  <div id="leave-confirm-modal" class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
+  <div id="leave-confirm-modal"
+    class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
     <div class="glass-card border border-amber-500/40 rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
-      <div class="w-14 h-14 mx-auto rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-2xl">
+      <div
+        class="w-14 h-14 mx-auto rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-2xl">
         <i class="fa-solid fa-person-walking-dashed-line-arrow-right"></i>
       </div>
       <div>
@@ -560,12 +633,14 @@
           This will mark attendance as <strong>LEFT</strong> and send an exit message to their parent.
         </p>
       </div>
-      
+
       <div class="grid grid-cols-2 gap-2.5 pt-2">
-        <button onclick="confirmStudentLeave()" class="py-3 px-4 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-extrabold rounded-xl text-xs shadow-lg shadow-amber-500/20 transition">
+        <button onclick="confirmStudentLeave()"
+          class="py-3 px-4 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-extrabold rounded-xl text-xs shadow-lg shadow-amber-500/20 transition">
           YES, LEAVING
         </button>
-        <button onclick="cancelStudentLeave()" class="py-3 px-4 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 font-bold rounded-xl text-xs transition">
+        <button onclick="cancelStudentLeave()"
+          class="py-3 px-4 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 font-bold rounded-xl text-xs transition">
           NO, CANCEL
         </button>
       </div>
@@ -573,7 +648,8 @@
   </div>
 
   <!-- 4. WhatsApp QR Code Modal (Web PC) -->
-  <div id="qr-modal" class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+  <div id="qr-modal"
+    class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
     <div class="glass-card border border-slate-700/80 rounded-3xl max-w-xs w-full p-6 text-center space-y-4 shadow-2xl">
       <div class="flex justify-between items-center">
         <h3 class="font-extrabold text-white text-sm flex items-center">
@@ -583,7 +659,8 @@
           <i class="fa-solid fa-xmark text-base"></i>
         </button>
       </div>
-      <p class="text-xs text-slate-400 leading-snug">Open WhatsApp on institute phone ➔ Linked Devices ➔ Scan this QR code:</p>
+      <p class="text-xs text-slate-400 leading-snug">Open WhatsApp on institute phone ➔ Linked Devices ➔ Scan this QR
+        code:</p>
       <div class="bg-white p-3 rounded-2xl inline-block mx-auto shadow-inner">
         <img id="qr-image" src="" alt="WhatsApp QR" class="w-48 h-48 mx-auto object-contain">
       </div>
@@ -592,7 +669,8 @@
   </div>
 
   <!-- 5. Server Config Modal -->
-  <div id="server-config-modal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+  <div id="server-config-modal"
+    class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
     <div class="glass-card border border-slate-700/80 rounded-3xl max-w-xs w-full p-5 space-y-3.5 shadow-2xl">
       <div class="flex justify-between items-center">
         <h3 class="font-extrabold text-white text-sm flex items-center">
@@ -603,15 +681,18 @@
         </button>
       </div>
       <p class="text-[11px] text-slate-400">Target server host address:</p>
-      <input type="text" id="config-backend-url" 
-             class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500">
+      <input type="text" id="config-backend-url"
+        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500">
       <div class="flex space-x-2 pt-1">
-        <button onclick="saveServerConfig()" class="flex-1 py-2.5 bg-emerald-600 rounded-xl text-xs font-bold text-white">Save</button>
-        <button onclick="resetServerConfig()" class="px-3 py-2.5 bg-slate-800 rounded-xl text-xs font-medium text-slate-300">Reset</button>
+        <button onclick="saveServerConfig()"
+          class="flex-1 py-2.5 bg-emerald-600 rounded-xl text-xs font-bold text-white">Save</button>
+        <button onclick="resetServerConfig()"
+          class="px-3 py-2.5 bg-slate-800 rounded-xl text-xs font-medium text-slate-300">Reset</button>
       </div>
     </div>
   </div>
 
   <script src="app.js"></script>
 </body>
+
 </html>

@@ -378,14 +378,24 @@ async function startScannerCamera() {
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     currentCameraStream = stream;
     videoStream.srcObject = stream;
+    videoStream.setAttribute('playsinline', '');
+    videoStream.setAttribute('muted', '');
+    videoStream.muted = true;
     videoStream.style.transform = (currentFacingMode === 'user') ? 'scaleX(-1)' : 'scaleX(1)';
 
-    videoStream.onloadedmetadata = () => {
-      videoStream.play();
+    videoStream.onloadedmetadata = async () => {
+      try {
+        await videoStream.play();
+      } catch (e) {
+        console.warn("videoStream play() failed:", e);
+      }
     };
+    try {
+      await videoStream.play();
+    } catch (e) {}
   } catch (err) {
     console.error("Camera access error:", err);
-    scannerStatusText.innerText = "Camera permission denied or camera not found.";
+    scannerStatusText.innerText = `Camera error: ${err.name} - ${err.message}`;
   }
 }
 
@@ -690,7 +700,7 @@ async function pollRemoteCaptureStatus() {
     const res = await fetch(`${getApiBaseUrl()}/api/remote-capture/status/${activeRemoteRequestId}`);
     const task = await res.json();
 
-    if (task && task.status === 'COMPLETED' && task.face_descriptor) {
+    if (task && (task.status === 'COMPLETED' || task.face_descriptor)) {
       clearInterval(remoteStatusPollTimer);
       remoteStatusPollTimer = null;
       activeRemoteRequestId = null;
@@ -698,16 +708,21 @@ async function pollRemoteCaptureStatus() {
       capturedRegistrationDescriptor = task.face_descriptor;
 
       const banner = document.getElementById('remote-status-banner');
-      banner.className = "text-xs text-emerald-400 pt-1 font-bold";
-      banner.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> Face successfully received from staff phone!`;
+      if (banner) {
+        banner.className = "text-xs text-emerald-400 pt-1 font-bold";
+        banner.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> Face photo successfully received from staff phone!`;
+      }
 
       const sendBtn = document.getElementById('btn-send-remote-req');
-      sendBtn.disabled = false;
-      sendBtn.innerHTML = `<i class="fa-solid fa-check mr-1.5"></i> Photo Synced`;
+      if (sendBtn) {
+        sendBtn.disabled = false;
+        sendBtn.className = "w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold rounded-xl text-xs transition flex items-center justify-center space-x-1.5 shadow-lg shadow-emerald-600/30";
+        sendBtn.innerHTML = `<i class="fa-solid fa-check mr-1.5"></i> Photo Received & Synced`;
+      }
 
       const ind = document.getElementById('face-captured-indicator');
       if (ind) {
-        ind.innerHTML = `<span class="text-emerald-400"><i class="fa-solid fa-check mr-1"></i> Received from Phone (128 vectors)</span>`;
+        ind.innerHTML = `<span class="text-emerald-400"><i class="fa-solid fa-check mr-1"></i> Received from Phone (128 facial vectors)</span>`;
       }
     }
   } catch (e) {}
@@ -730,6 +745,29 @@ function startListeningForRemoteSnapRequests() {
   }, 2000);
 }
 
+let snapFacingMode = 'environment'; // default to back camera when taking photo of a student!
+
+async function toggleSnapCameraFacing() {
+  snapFacingMode = (snapFacingMode === 'user') ? 'environment' : 'user';
+  try {
+    if (snapCameraStream) {
+      snapCameraStream.getTracks().forEach(t => t.stop());
+      snapCameraStream = null;
+    }
+    const snapVid = document.getElementById('snap-phone-video');
+    snapCameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: snapFacingMode }, width: { ideal: 640 }, height: { ideal: 480 } },
+      audio: false
+    });
+    snapVid.srcObject = snapCameraStream;
+    snapVid.setAttribute('playsinline', '');
+    snapVid.muted = true;
+    snapVid.style.transform = (snapFacingMode === 'user') ? 'scaleX(-1)' : 'scaleX(1)';
+    await snapVid.play().catch(e => console.log('play ignored', e));
+  } catch (err) {
+    console.warn("Error switching camera facing:", err);
+  }
+}
 async function showRemoteSnapModal(task) {
   currentIncomingSnapTask = task;
   const nameEl = document.getElementById('snap-target-name');
@@ -738,16 +776,35 @@ async function showRemoteSnapModal(task) {
   }
   document.getElementById('incoming-snap-modal').classList.remove('hidden');
 
+  const btn = document.getElementById('btn-snap-submit');
+  if (btn) {
+    btn.disabled = false;
+    btn.innerText = "SNAP & SEND";
+  }
+
   try {
     const snapVid = document.getElementById('snap-phone-video');
+    if (snapCameraStream) {
+      snapCameraStream.getTracks().forEach(t => t.stop());
+      snapCameraStream = null;
+    }
+    // Stop main camera temporarily so snap camera gets clean hardware access
+    if (currentCameraStream) {
+      currentCameraStream.getTracks().forEach(t => t.stop());
+      currentCameraStream = null;
+    }
+
     snapCameraStream = await navigator.mediaDevices.getUserMedia({
-      video: { width: 480, height: 480, facingMode: { ideal: 'user' } },
+      video: { facingMode: { ideal: snapFacingMode }, width: { ideal: 640 }, height: { ideal: 480 } },
       audio: false
     });
     snapVid.srcObject = snapCameraStream;
-    snapVid.play();
+    snapVid.setAttribute('playsinline', '');
+    snapVid.muted = true;
+    snapVid.style.transform = (snapFacingMode === 'user') ? 'scaleX(-1)' : 'scaleX(1)';
+    await snapVid.play().catch(e => console.log('play ignored', e));
   } catch (err) {
-    alert("Camera error on staff phone: " + err.message);
+    console.warn("Camera setup warning:", err);
   }
 }
 
@@ -806,12 +863,22 @@ async function submitRemoteSnap() {
 }
 
 function dismissRemoteSnap() {
-  document.getElementById('incoming-snap-modal').classList.add('hidden');
+  const modal = document.getElementById('incoming-snap-modal');
+  if (modal) modal.classList.add('hidden');
   if (snapCameraStream) {
     snapCameraStream.getTracks().forEach(t => t.stop());
     snapCameraStream = null;
   }
+  if (currentIncomingSnapTask && currentIncomingSnapTask.requestId) {
+    fetch(`${getApiBaseUrl()}/api/remote-capture/dismiss/${currentIncomingSnapTask.requestId}`, { method: 'POST' }).catch(() => {});
+  }
   currentIncomingSnapTask = null;
+
+  // Restore scanner camera if on scanner screen
+  const scannerTab = document.getElementById('tab-scanner');
+  if (scannerTab && !scannerTab.classList.contains('hidden')) {
+    startScannerCamera();
+  }
 }
 
 // Local Capture face descriptor for Registration

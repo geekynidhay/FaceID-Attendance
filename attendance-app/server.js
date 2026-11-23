@@ -68,6 +68,14 @@ app.post('/api/remote-capture/create', (req, res) => {
 /**
  * Poll for Remote Capture Task (Phone polls this)
  */
+app.post('/api/remote-capture/dismiss/:requestId', (req, res) => {
+  const { requestId } = req.params;
+  if (remoteCaptureRequests[requestId]) {
+    remoteCaptureRequests[requestId].status = 'dismissed';
+  }
+  res.json({ success: true });
+});
+
 app.get('/api/remote-capture/pending/:deviceId', (req, res) => {
   const { deviceId } = req.params;
   const pending = Object.values(remoteCaptureRequests).find(r => r.device_id === deviceId && r.status === 'PENDING');
@@ -414,7 +422,26 @@ app.get('/api/whatsapp/qr', async (req, res) => {
   }
 });
 
+const fs = require('fs');
+const https = require('https');
+const HTTP_PORT = PORT;
+const HTTPS_PORT = 4443;
+
+// Serve both HTTP (for local backwards compat) and HTTPS (for Android Chrome secure getUserMedia context)
+let httpsServer = null;
+try {
+  const sslKey = fs.readFileSync(path.join(__dirname, 'server.key'));
+  const sslCert = fs.readFileSync(path.join(__dirname, 'server.cert'));
+  httpsServer = https.createServer({ key: sslKey, cert: sslCert }, app);
+  httpsServer.listen(HTTPS_PORT, '0.0.0.0', () => {
+    console.log(`🔒 Secure HTTPS running on: https://localhost:${HTTPS_PORT}`);
+  });
+} catch (e) {
+  console.warn("HTTPS setup skipped:", e.message);
+}
+
 app.listen(PORT, '0.0.0.0', () => {
+
   console.log(`=================================================`);
   console.log(`🚀 Attendance System running on: http://localhost:${PORT}`);
   console.log(`📱 Access on Mobile via Local Wi-Fi: http://<YOUR_PC_IP>:${PORT}`);
