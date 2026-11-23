@@ -86,12 +86,14 @@ app.get('/api/remote-capture/pending/:deviceId', (req, res) => {
  * Submit Remote Capture Face Descriptor (Phone sends this)
  */
 app.post('/api/remote-capture/submit', (req, res) => {
+  console.log('[DEBUG REMOTE SUBMIT]', req.body.requestId, 'len:', req.body.face_descriptor ? req.body.face_descriptor.length : 0);
   const { requestId, face_descriptor } = req.body;
   if (!requestId || !face_descriptor) return res.status(400).json({ error: 'requestId and face_descriptor required' });
 
   if (remoteCaptureRequests[requestId]) {
     remoteCaptureRequests[requestId].face_descriptor = face_descriptor;
     remoteCaptureRequests[requestId].status = 'COMPLETED';
+    remoteCaptureRequests[requestId].updatedAt = Date.now();
     return res.json({ success: true });
   }
   res.status(404).json({ error: 'Request not found' });
@@ -100,7 +102,17 @@ app.post('/api/remote-capture/submit', (req, res) => {
 /**
  * Check Remote Capture Status (Web polls this)
  */
+app.get('/api/remote-capture/latest/:deviceId', (req, res) => {
+  const { deviceId } = req.params;
+  const list = Object.values(remoteCaptureRequests)
+    .filter(r => r.device_id === deviceId && (r.status === 'COMPLETED' || r.face_descriptor))
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  res.json(list[0] || null);
+});
+
 app.get('/api/remote-capture/status/:requestId', (req, res) => {
+  const st = remoteCaptureRequests[req.params.requestId];
+  if (Math.random() < 0.2) console.log('[DEBUG REMOTE STATUS POLL]', req.params.requestId, st ? st.status : 'not_found');
   const { requestId } = req.params;
   const task = remoteCaptureRequests[requestId];
   if (!task) return res.status(404).json({ error: 'Request not found' });

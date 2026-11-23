@@ -67,10 +67,8 @@
       <!-- Brand & Staff Identifier -->
       <div class="flex items-center space-x-3">
         <div
-          class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 p-[1.5px] flex items-center justify-center shadow-lg shadow-emerald-500/20">
-          <div class="w-full h-full bg-slate-950 rounded-2xl flex items-center justify-center">
-            <i class="fa-solid fa-graduation-cap text-emerald-400 text-lg"></i>
-          </div>
+          class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-500 to-teal-400 p-[1.5px] flex items-center justify-center shadow-lg shadow-indigo-500/20 overflow-hidden">
+          <img src="logo.png" alt="DOT-CMC" class="w-full h-full object-cover rounded-2xl" />
         </div>
         <div>
           <h1 class="font-black text-base md:text-lg tracking-tight text-white flex items-center">
@@ -163,18 +161,18 @@
         </div>
       </div>
 
-      <!-- BOTTOM SCANNER CONTROLS (ONLY SCAN FACE AND AUTO) -->
-      <div class="w-full max-w-lg grid grid-cols-2 gap-3 pt-1">
+      <!-- BOTTOM SCANNER CONTROLS (ONLY SCAN FACE AND AUTO - VERTICALLY ALIGNED ON PHONE) -->
+      <div class="w-full max-w-md flex flex-col space-y-2.5 pt-1">
         <button id="btn-manual-scan" onclick="triggerManualScan()"
-          class="py-3.5 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 text-white font-extrabold rounded-2xl text-xs md:text-sm shadow-xl shadow-emerald-500/25 active:scale-95 transition flex items-center justify-center space-x-2">
-          <i class="fa-solid fa-expand text-base"></i>
-          <span>Scan Face (Enter)</span>
+          class="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 text-white font-extrabold rounded-2xl text-xs md:text-sm shadow-xl shadow-emerald-500/25 active:scale-95 transition flex items-center justify-center space-x-2">
+          <i class="fa-solid fa-camera text-base"></i>
+          <span>Capture</span>
         </button>
 
         <button id="btn-toggle-continuous" onclick="toggleContinuousScan()"
-          class="py-3.5 px-4 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 font-bold rounded-2xl text-xs md:text-sm active:scale-95 transition flex items-center justify-center space-x-2">
-          <i class="fa-solid fa-bolt text-amber-400"></i>
-          <span>Auto: <span id="auto-scan-status" class="text-rose-400 font-bold">OFF</span></span>
+          class="w-full py-2.5 px-4 bg-slate-900/90 border border-slate-800 hover:border-slate-700 text-slate-300 font-semibold rounded-2xl text-xs active:scale-95 transition flex items-center justify-center space-x-2">
+          <i class="fa-solid fa-bolt text-amber-400 text-xs"></i>
+          <span>Auto Attendance: <span id="auto-scan-status" class="text-rose-400 font-bold ml-1">OFF</span></span>
         </button>
       </div>
 
@@ -605,14 +603,15 @@
         </button>
       </div>
 
-      <div class="grid grid-cols-2 gap-2 pt-1">
+      <div class="flex flex-col space-y-2 pt-1 w-full">
         <button onclick="submitRemoteSnap()" id="btn-snap-submit"
-          class="py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-extrabold rounded-xl text-xs shadow-lg shadow-indigo-600/30 transition">
-          SNAP & SEND
+          class="w-full py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:scale-95 text-white font-extrabold rounded-2xl text-xs md:text-sm shadow-xl shadow-indigo-600/30 transition flex items-center justify-center space-x-2">
+          <i class="fa-solid fa-camera"></i>
+          <span>Capture</span>
         </button>
         <button onclick="dismissRemoteSnap()"
-          class="py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 font-bold rounded-xl text-xs transition">
-          DISMISS
+          class="w-full py-2.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 active:scale-95 text-slate-400 hover:text-slate-200 font-semibold rounded-2xl text-xs transition">
+          Dismiss
         </button>
       </div>
     </div>

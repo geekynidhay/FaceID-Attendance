@@ -460,7 +460,7 @@ async function triggerManualScan() {
     scannerStatusText.innerText = "Scan error: " + err.message;
   } finally {
     setTimeout(() => {
-      if (btn) btn.innerHTML = `<i class="fa-solid fa-expand text-base"></i><span>Scan Face (Enter)</span>`;
+      if (btn) btn.innerHTML = `<i class="fa-solid fa-expand text-base"></i><span>Capture</span>`;
     }, 1200);
   }
 }
@@ -694,21 +694,40 @@ async function dispatchRemoteCaptureRequest() {
 }
 
 async function pollRemoteCaptureStatus() {
-  if (!activeRemoteRequestId) return;
+  const select = document.getElementById('select-remote-device');
+  const targetDeviceId = select?.value;
 
   try {
-    const res = await fetch(`${getApiBaseUrl()}/api/remote-capture/status/${activeRemoteRequestId}`);
-    const task = await res.json();
+    // 1. First check by specific active request ID if available
+    let task = null;
+    if (activeRemoteRequestId) {
+      const res = await fetch(`${getApiBaseUrl()}/api/remote-capture/status/${activeRemoteRequestId}`);
+      if (res.ok) task = await res.json();
+    }
+
+    // 2. Fallback: if not found by ID or ID expired, check latest completed capture for target device
+    if ((!task || (!task.face_descriptor && task.status !== 'COMPLETED')) && targetDeviceId) {
+      const fallbackRes = await fetch(`${getApiBaseUrl()}/api/remote-capture/latest/${targetDeviceId}`);
+      if (fallbackRes.ok) {
+        const latestTask = await fallbackRes.json();
+        if (latestTask && latestTask.face_descriptor && (Date.now() - latestTask.updatedAt < 60000)) {
+          task = latestTask;
+        }
+      }
+    }
 
     if (task && (task.status === 'COMPLETED' || task.face_descriptor)) {
-      clearInterval(remoteStatusPollTimer);
-      remoteStatusPollTimer = null;
+      if (remoteStatusPollTimer) {
+        clearInterval(remoteStatusPollTimer);
+        remoteStatusPollTimer = null;
+      }
       activeRemoteRequestId = null;
 
       capturedRegistrationDescriptor = task.face_descriptor;
 
       const banner = document.getElementById('remote-status-banner');
       if (banner) {
+        banner.classList.remove('hidden', 'animate-pulse');
         banner.className = "text-xs text-emerald-400 pt-1 font-bold";
         banner.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> Face photo successfully received from staff phone!`;
       }
@@ -724,8 +743,17 @@ async function pollRemoteCaptureStatus() {
       if (ind) {
         ind.innerHTML = `<span class="text-emerald-400"><i class="fa-solid fa-check mr-1"></i> Received from Phone (128 facial vectors)</span>`;
       }
+
+      // Flash SAVE button to clearly indicate readiness
+      const saveBtn = document.getElementById('btn-submit-reg');
+      if (saveBtn) {
+        saveBtn.classList.add('ring-4', 'ring-emerald-400');
+        setTimeout(() => saveBtn.classList.remove('ring-4', 'ring-emerald-400'), 2500);
+      }
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn("Poll status warning:", e);
+  }
 }
 
 // Phone Receiver for Remote Snap Popup
@@ -779,7 +807,7 @@ async function showRemoteSnapModal(task) {
   const btn = document.getElementById('btn-snap-submit');
   if (btn) {
     btn.disabled = false;
-    btn.innerText = "SNAP & SEND";
+    btn.innerHTML = `<i class="fa-solid fa-camera mr-1.5"></i>Capture`;
   }
 
   try {
@@ -836,13 +864,14 @@ async function submitRemoteSnap() {
     if (!detection) {
       alert("No face detected! Look directly into the phone camera.");
       btn.disabled = false;
-      btn.innerText = "SNAP & SEND";
+      btn.innerHTML = `<i class="fa-solid fa-camera mr-1.5"></i>Capture`;
       return;
     }
 
     const descriptorArray = Array.from(detection.descriptor);
 
-    await fetch(`${getApiBaseUrl()}/api/remote-capture/submit`, {
+    const submitUrl = `${getApiBaseUrl()}/api/remote-capture/submit`;
+    const res = await fetch(submitUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -851,6 +880,11 @@ async function submitRemoteSnap() {
       })
     });
 
+    const resData = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(resData.error || `Server responded with status ${res.status}`);
+    }
+
     dismissRemoteSnap();
     alert(`Photo for "${targetStudentName}" sent to PC successfully!`);
 
@@ -858,7 +892,7 @@ async function submitRemoteSnap() {
     alert("Failed to submit photo: " + err.message);
   } finally {
     btn.disabled = false;
-    btn.innerText = "SNAP & SEND";
+    btn.innerHTML = `<i class="fa-solid fa-camera mr-1.5"></i>Capture`;
   }
 }
 

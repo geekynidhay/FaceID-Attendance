@@ -2,9 +2,12 @@
   "name": "attendance-app",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "electron-main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js",
+    "electron": "electron .",
+    "dist:win": "electron-builder --win nsis --x64"
   },
   "keywords": [],
   "author": "",
@@ -19,5 +22,31 @@
     "express": "^5.3.0",
     "multer": "^2.5.0",
     "sqlite3": "^6.0.1"
+  },
+  "devDependencies": {
+    "electron": "^28.2.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.dotcmc.attendance",
+    "productName": "DOT-CMC Attendance",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "public/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "DOT-CMC Attendance"
+    },
+    "files": [
+      "**/*",
+      "!attendance.db-journal"
+    ]
   }
 }
